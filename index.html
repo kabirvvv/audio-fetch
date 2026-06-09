@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Audio Fetch</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111;
+      --accent: #c8f135;
+      --text: #f0f0f0;
+      --muted: #555;
+      --border: #222;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.3rem;
+      letter-spacing: -1px;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-bottom: 2.5rem;
+      letter-spacing: 0.05em;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.82rem;
+      padding: 0.75rem 1rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    button {
+      background: var(--accent);
+      color: #000;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: none;
+      padding: 0.75rem 1.4rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .status {
+      font-size: 0.78rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+      letter-spacing: 0.03em;
+    }
+
+    .status.error { color: #ff4f4f; }
+    .status.success { color: var(--accent); }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+
+    .note {
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AUDIO<span>.</span>FETCH</h1>
+    <p class="sub">// paste url → get mp3. that's it.</p>
+
+    <div class="input-row">
+      <input type="text" id="urlInput" placeholder="https://youtube.com/watch?v=..." />
+      <button id="fetchBtn" onclick="fetchAudio()">FETCH</button>
+    </div>
+
+    <p class="status" id="status">waiting for url...</p>
+
+    <hr class="divider" />
+
+    <p class="note">
+      supports youtube, soundcloud, and most platforms yt-dlp handles.<br/>
+      output is mp3 · best available audio quality.
+    </p>
+  </div>
+
+  <script>
+    async function fetchAudio() {
+      const url = document.getElementById('urlInput').value.trim();
+      const status = document.getElementById('status');
+      const btn = document.getElementById('fetchBtn');
+
+      if (!url) {
+        status.className = 'status error';
+        status.textContent = 'no url provided.';
+        return;
+      }
+
+      btn.disabled = true;
+      status.className = 'status';
+      status.textContent = 'fetching... this may take a moment.';
+
+      try {
+        const res = await fetch('/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          let msg;
+          try {
+            const err = JSON.parse(text);  // fixed: was Json.parse
+            msg = err.details || 'unknown error';
+          } catch {
+            msg = 'server error';
+          }
+          throw new Error(msg);
+        }
+
+        const blob = await res.blob();
+        const filename = res.headers.get('content-disposition')
+          ?.split('filename=')[1]?.replace(/"/g, '') || 'audio.mp3';
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+
+        status.className = 'status success';
+        status.textContent = `done. downloading → ${filename}`;
+
+      } catch (err) {
+        status.className = 'status error';
+        status.textContent = `error: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('urlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchAudio();
+    });
+  </script>
+</body>
+</html>
