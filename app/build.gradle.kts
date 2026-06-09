@@ -16,16 +16,13 @@ android {
         versionName = "1.0"
 
         ndk {
-            // Chaquopy requires at least one ABI
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
 
         python {
-            // pip packages installed into the APK at build time
             pip {
                 install("yt-dlp")
             }
-            // Point Chaquopy at the Python source files
             buildPython("3.13")
         }
     }
