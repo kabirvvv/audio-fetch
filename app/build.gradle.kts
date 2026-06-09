@@ -26,7 +26,7 @@ android {
                 install("yt-dlp")
             }
             // Point Chaquopy at the Python source files
-            buildPython("3.11")
+            buildPython("3.13")
         }
     }
 
