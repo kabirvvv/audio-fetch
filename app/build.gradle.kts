@@ -10,8 +10,8 @@ android {
         applicationId = "com.audiofetch"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
-        versionName = "6"
+        versionCode = 7
+        versionName = "7"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
