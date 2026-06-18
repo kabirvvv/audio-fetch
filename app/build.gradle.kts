@@ -13,7 +13,7 @@ android {
         versionCode = 9
         versionName = "9"
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
     // --- NEW: signing config for release builds ---
