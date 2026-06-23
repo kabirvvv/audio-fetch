@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AudioFetch</string>
+    <string name="hint_search">search or paste a url</string>
+    <string name="no_tracks">no tracks yet — search or paste a link above</string>
+    <string name="notification_channel_id">audiofetch_playback</string>
+    <string name="notification_channel_name">Playback</string>
 </resources>
