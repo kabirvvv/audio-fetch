@@ -26,20 +26,18 @@ class VibeVisualizer @JvmOverloads constructor(
         invalidate()
     }
 
-    fun updateFft(data: ByteArray) {
-        if (data.size != smoothed.size) {
-            fftData = data.copyOf()
-        } else {
-            // Smooth the data for organic animation
-            for (i in data.indices) {
-                val raw = (data[i].toInt() and 0xFF).toFloat()
-                smoothed[i] = smoothed[i] * smoothFactor + raw * (1f - smoothFactor)
-            }
-            fftData = data.copyOf()
-        }
-        invalidate()
+   fun updateFft(data: ByteArray) {
+    fftData = data.copyOf()
+    val bands = smoothed.size
+    for (i in 0 until bands) {
+        // Map our 128 smoothed slots across the useful FFT range
+        val dataIndex = (i.toFloat() / bands * (data.size / 2f)).toInt()
+            .coerceIn(0, data.size - 1)
+        val raw = (data[dataIndex].toInt() and 0xFF).toFloat()
+        smoothed[i] = smoothed[i] * smoothFactor + raw * (1f - smoothFactor)
     }
-
+    invalidate()
+}
     fun clear() {
         // Animate bars back to zero smoothly
         for (i in smoothed.indices) {
