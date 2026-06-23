@@ -1,5 +1,6 @@
 package com.audiofetch
 
+import android.util.Log
 import android.Manifest
 import android.animation.ValueAnimator
 import android.content.ComponentName
@@ -461,6 +462,14 @@ private fun startVisualizer() {
         equalizer = null
         binding.visualizer.clear()
     }
+    private fun initEqualizer(audioSessionId: Int) {
+    try {
+        equalizer?.release()
+        equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 
     private fun updateGlow(fft: ByteArray) {
         if (fft.isEmpty()) return
