@@ -419,6 +419,7 @@ private fun startVisualizer() {
     }
 
     val audioSessionId = PlayerService.audioSessionId
+    Log.d("VIBE", "audioSessionId = ${PlayerService.audioSessionId}")
     if (audioSessionId == 0) {
         // Session not ready yet — retry in 500ms
         uiHandler.postDelayed({ startVisualizer() }, 500)
