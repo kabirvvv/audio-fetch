@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Audio Visualizer -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -62,7 +65,7 @@
 
         </service>
 
-        <!-- FileProvider (used for APK installation) -->
+        <!-- FileProvider (APK Updates) -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
