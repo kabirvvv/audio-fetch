@@ -410,45 +410,44 @@ class MainActivity : AppCompatActivity() {
     // VISUALIZER & EQ
     // ─────────────────────────────────────────────
 
-    private fun startVisualizer() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
-            return
-        }
-        val exoPlayer = (player as? androidx.media3.exoplayer.ExoPlayer) ?: return
-        val audioSessionId = exoPlayer.audioSessionId
-        if (audioSessionId == 0) return
-        try {
-            androidVisualizer?.release()
-            androidVisualizer = Visualizer(audioSessionId).apply {
-                captureSize = Visualizer.getCaptureSizeRange()[1]
-                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: Visualizer, waveform: ByteArray, sr: Int) {}
-                    override fun onFftDataCapture(v: Visualizer, fft: ByteArray, sr: Int) {
-                        runOnUiThread {
-                            binding.visualizer.updateFft(fft)
-                            updateGlow(fft)
-                        }
+   private fun startVisualizer() {
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+        != PackageManager.PERMISSION_GRANTED) {
+        ActivityCompat.requestPermissions(this,
+            arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
+        return
+    }
+    val audioSessionId = PlayerService.audioSessionId
+    if (audioSessionId == 0) return
+    try {
+        androidVisualizer?.release()
+        androidVisualizer = Visualizer(audioSessionId).apply {
+            captureSize = Visualizer.getCaptureSizeRange()[1]
+            setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                override fun onWaveFormDataCapture(v: Visualizer, waveform: ByteArray, sr: Int) {}
+                override fun onFftDataCapture(v: Visualizer, fft: ByteArray, sr: Int) {
+                    runOnUiThread {
+                        binding.visualizer.updateFft(fft)
+                        updateGlow(fft)
                     }
-                }, Visualizer.getMaxCaptureRate() / 2, false, true)
-                enabled = true
-            }
-            initEqualizer(audioSessionId)
-        } catch (e: Exception) {
-            e.printStackTrace()
+                }
+            }, Visualizer.getMaxCaptureRate() / 2, false, true)
+            enabled = true
         }
+        initEqualizer(audioSessionId)
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
+}
 
-    private fun initEqualizer(audioSessionId: Int) {
-        try {
-            equalizer?.release()
-            equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+private fun initEqualizer(audioSessionId: Int) {
+    try {
+        equalizer?.release()
+        equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
+}
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
