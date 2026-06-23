@@ -68,7 +68,7 @@
                     android:layout_height="56dp"
                     android:background="@drawable/bg_input"
                     android:hint="@string/hint_search"
-                    android:hintTextColor="#40FFFFFF"
+                    android:textColorHint="#40FFFFFF"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     android:letterSpacing="0.05"
@@ -321,7 +321,7 @@
     <FrameLayout
         android:id="@+id/playlistSheet"
         android:layout_width="match_parent"
-        android:layout_height="70%"
+        android:layout_height="560dp"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_bottom_sheet"
         android:translationY="999dp"
