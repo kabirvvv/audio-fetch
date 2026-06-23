@@ -1,48 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Status colors (existing) -->
+
+    <!-- ===================================================== -->
+    <!-- Semantic Colors (Default: Emerald Theme) -->
+    <!-- ===================================================== -->
+
+    <color name="accent">#00E5A0</color>
+    <color name="surface">#1A2A22</color>
+    <color name="bg">#0D1A14</color>
+    <color name="text">#FFFFFF</color>
+
+    <!-- ===================================================== -->
+    <!-- Status Colors -->
+    <!-- ===================================================== -->
+
     <color name="status_error">#FF5252</color>
     <color name="status_success">#00FF88</color>
     <color name="status_muted">#888888</color>
 
+    <!-- ===================================================== -->
     <!-- Base UI -->
+    <!-- ===================================================== -->
+
     <color name="bg_deep">#020503</color>
     <color name="glass_border">#1AFFFFFF</color>
+
     <color name="text_high">#FFFFFF</color>
     <color name="text_low">#80FFFFFF</color>
 
-    <!-- Emerald (default) -->
+    <!-- ===================================================== -->
+    <!-- Emerald (Default) -->
+    <!-- ===================================================== -->
+
     <color name="emerald_bg">#020503</color>
     <color name="emerald_accent">#00FFA2</color>
     <color name="emerald_vibe">#0A1F11</color>
 
+    <!-- ===================================================== -->
     <!-- Nebula -->
+    <!-- ===================================================== -->
+
     <color name="nebula_bg">#050A1F</color>
     <color name="nebula_accent">#00D2FF</color>
     <color name="nebula_vibe">#0A1A3E</color>
 
+    <!-- ===================================================== -->
     <!-- Solaris -->
+    <!-- ===================================================== -->
+
     <color name="solaris_bg">#1F150A</color>
     <color name="solaris_accent">#FFCC33</color>
     <color name="solaris_vibe">#2E1D0A</color>
 
+    <!-- ===================================================== -->
     <!-- Midnight -->
+    <!-- ===================================================== -->
+
     <color name="midnight_bg">#020208</color>
     <color name="midnight_accent">#0077FF</color>
     <color name="midnight_vibe">#05051A</color>
 
+    <!-- ===================================================== -->
     <!-- Cyberpunk -->
+    <!-- ===================================================== -->
+
     <color name="cyberpunk_bg">#0A0B1E</color>
     <color name="cyberpunk_accent">#FF00FF</color>
     <color name="cyberpunk_vibe">#190A1E</color>
 
+    <!-- ===================================================== -->
     <!-- Flare -->
+    <!-- ===================================================== -->
+
     <color name="flare_bg">#120505</color>
     <color name="flare_accent">#FF4D00</color>
     <color name="flare_vibe">#2E0B0B</color>
 
-    <!-- H.O.B -->
+    <!-- ===================================================== -->
+    <!-- House of Balloons (H.O.B) -->
+    <!-- ===================================================== -->
+
     <color name="hob_bg">#000000</color>
     <color name="hob_accent">#FFFFFF</color>
     <color name="hob_vibe">#111111</color>
+
 </resources>
