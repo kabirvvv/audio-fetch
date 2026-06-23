@@ -10,17 +10,27 @@ class PlayerService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
 
+    companion object {
+        // Readable by MainActivity without casting MediaController to ExoPlayer
+        var audioSessionId: Int = 0
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
+
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .setUsage(C.USAGE_MEDIA)
             .build()
 
         val player = ExoPlayer.Builder(this)
-            .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
+            .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        // Expose session ID as soon as the player is created
+        audioSessionId = player.audioSessionId
 
         mediaSession = MediaSession.Builder(this, player).build()
     }
@@ -35,6 +45,7 @@ class PlayerService : MediaSessionService() {
             release()
             mediaSession = null
         }
+        audioSessionId = 0
         super.onDestroy()
     }
 }
