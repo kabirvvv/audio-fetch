@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Audio Visualizer -->
+    <!-- Audio -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Storage -->
+    <!-- Legacy Storage -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -15,9 +16,6 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-
-    <uses-permission
-        android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <!-- APK Installation -->
     <uses-permission
@@ -37,7 +35,6 @@
         android:theme="@style/Theme.AudioFetch"
         android:usesCleartextTraffic="false">
 
-        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -52,7 +49,6 @@
 
         </activity>
 
-        <!-- Media Playback Service -->
         <service
             android:name=".PlayerService"
             android:exported="true"
@@ -65,7 +61,6 @@
 
         </service>
 
-        <!-- FileProvider (APK Updates) -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
