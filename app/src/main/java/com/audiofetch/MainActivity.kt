@@ -410,16 +410,21 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
     // VISUALIZER & EQ
     // ─────────────────────────────────────────────
-
-   private fun startVisualizer() {
+private fun startVisualizer() {
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
         != PackageManager.PERMISSION_GRANTED) {
         ActivityCompat.requestPermissions(this,
             arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
         return
     }
+
     val audioSessionId = PlayerService.audioSessionId
-    if (audioSessionId == 0) return
+    if (audioSessionId == 0) {
+        // Session not ready yet — retry in 500ms
+        uiHandler.postDelayed({ startVisualizer() }, 500)
+        return
+    }
+
     try {
         androidVisualizer?.release()
         androidVisualizer = Visualizer(audioSessionId).apply {
@@ -440,16 +445,6 @@ class MainActivity : AppCompatActivity() {
         e.printStackTrace()
     }
 }
-
-private fun initEqualizer(audioSessionId: Int) {
-    try {
-        equalizer?.release()
-        equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
-
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
