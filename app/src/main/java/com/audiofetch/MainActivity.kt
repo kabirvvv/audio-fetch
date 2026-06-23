@@ -1,13 +1,14 @@
 package com.audiofetch
 
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
+import android.Manifest
 import android.animation.ValueAnimator
 import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.media.audiofx.Equalizer
 import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
@@ -16,7 +17,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.EditorInfo
@@ -24,6 +24,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -50,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var player: MediaController? = null
     private var androidVisualizer: Visualizer? = null
+    private var equalizer: Equalizer? = null
 
     // State
     private val tracks = mutableListOf<Track>()
@@ -76,15 +78,12 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Check for updates
         checkForUpdate()
 
-        // Init Python / Chaquopy
         if (!Python.isStarted()) {
             Python.start(AndroidPlatform(this))
         }
 
-        // Load saved theme
         val savedThemeId = getSharedPreferences("vibe", MODE_PRIVATE)
             .getString("theme", "emerald") ?: "emerald"
         currentTheme = VibeThemes.byId(savedThemeId)
@@ -93,7 +92,6 @@ class MainActivity : AppCompatActivity() {
         applyTheme(currentTheme, animate = false)
         connectPlayer()
 
-        // Scan existing downloads
         lifecycleScope.launch {
             val scanned = withContext(Dispatchers.IO) { MusicScanner.scanDownloads(this@MainActivity) }
             if (scanned.isNotEmpty()) {
@@ -109,26 +107,22 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun setupUI() {
-        // RecyclerView
         trackAdapter = TrackAdapter(mutableListOf(), ::loadTrack)
         binding.playlistRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = trackAdapter
         }
 
-        // Download / search button
         binding.fetchBtn.setOnClickListener { startDownload() }
         binding.urlInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) { startDownload(); true } else false
         }
 
-        // Playback controls
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
         binding.nextBtn.setOnClickListener { playNext() }
         binding.prevBtn.setOnClickListener { playPrev() }
         binding.repeatBtn.setOnClickListener { cycleRepeat() }
 
-        // Seek bar
         binding.seekBar.onSeek = { fraction ->
             player?.let { p ->
                 val pos = (fraction * p.duration).toLong()
@@ -136,28 +130,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Playlist sheet
         binding.playlistBtn.setOnClickListener { showPlaylist() }
         binding.closePlaylistBtn.setOnClickListener { hidePlaylist() }
         binding.clearQueueBtn.setOnClickListener { clearQueue() }
 
-        // Settings panel
         binding.menuBtn.setOnClickListener { showSettings() }
         binding.closeSettingsBtn.setOnClickListener { hideSettings() }
 
-        // Scrim dismisses everything
         binding.scrim.setOnClickListener {
             hidePlaylist()
             hideSettings()
         }
 
-        // EQ sliders (each SeekBar goes 0-24, centre 12 = 0dB)
         setupEQ()
-
-        // Sleep timer chips
         setupTimerChips()
-
-        // Theme grid
         setupThemeGrid()
     }
 
@@ -165,36 +151,50 @@ class MainActivity : AppCompatActivity() {
         fun dBFromProgress(p: Int) = (p - 12).toFloat()
         fun label(v: Float) = if (v >= 0) "+${v.toInt()}dB" else "${v.toInt()}dB"
 
+        fun applyEQ() {
+            val eq = equalizer ?: return
+            if (!eq.enabled) eq.enabled = true
+            val numBands = eq.numberOfBands.toInt()
+            val range = eq.bandLevelRange
+            val minMB = range[0]; val maxMB = range[1]
+
+            fun progressToMillibels(p: Int): Short {
+                val fraction = p / 24f
+                return (minMB + (fraction * (maxMB - minMB))).toInt().toShort()
+            }
+
+            if (numBands >= 1) eq.setBandLevel(0, progressToMillibels(binding.eqLow.progress))
+            if (numBands >= 3) eq.setBandLevel((numBands / 2).toShort(), progressToMillibels(binding.eqMid.progress))
+            if (numBands >= 2) eq.setBandLevel((numBands - 1).toShort(), progressToMillibels(binding.eqHigh.progress))
+        }
+
         binding.eqLow.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) {
-                val dB = dBFromProgress(p)
-                binding.eqLowVal.text = label(dB)
-                // Future: wire to AudioEffect if needed
+                binding.eqLowVal.text = label(dBFromProgress(p)); applyEQ()
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
         binding.eqMid.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) {
-                binding.eqMidVal.text = label(dBFromProgress(p))
+                binding.eqMidVal.text = label(dBFromProgress(p)); applyEQ()
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
         binding.eqHigh.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) {
-                binding.eqHighVal.text = label(dBFromProgress(p))
+                binding.eqHighVal.text = label(dBFromProgress(p)); applyEQ()
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
 
-        // EQ preset chips
         val presets = listOf("Flat", "Bass", "Pop", "Chill")
         val presetValues = mapOf(
-            "Flat" to Triple(12, 12, 12),
-            "Bass" to Triple(20, 14, 10),
-            "Pop" to Triple(14, 16, 18),
+            "Flat"  to Triple(12, 12, 12),
+            "Bass"  to Triple(20, 14, 10),
+            "Pop"   to Triple(14, 16, 18),
             "Chill" to Triple(16, 10, 14)
         )
         presets.forEach { name ->
@@ -205,6 +205,7 @@ class MainActivity : AppCompatActivity() {
                 binding.eqMid.progress = m
                 binding.eqHigh.progress = h
                 updateChipSelection(binding.eqPresets, chip)
+                applyEQ()
             }
             binding.eqPresets.addView(chip)
         }
@@ -236,14 +237,12 @@ class MainActivity : AppCompatActivity() {
                 gd.cornerRadius = size / 2f
                 background = gd
                 if (theme.id == currentTheme.id) {
-                    alpha = 1f
-                    scaleX = 1.15f; scaleY = 1.15f
+                    alpha = 1f; scaleX = 1.15f; scaleY = 1.15f
                 } else {
                     alpha = 0.6f
                 }
                 setOnClickListener {
                     applyTheme(theme, animate = true)
-                    // Reset all dots
                     for (i in 0 until binding.themeGrid.childCount) {
                         val v = binding.themeGrid.getChildAt(i)
                         v.alpha = 0.6f; v.scaleX = 1f; v.scaleY = 1f
@@ -303,7 +302,6 @@ class MainActivity : AppCompatActivity() {
         getSharedPreferences("vibe", MODE_PRIVATE).edit().putString("theme", theme.id).apply()
 
         if (animate) {
-            // Animate background color
             val from = (binding.bgVibe.background as? GradientDrawable)?.colors?.getOrNull(0)
                 ?: theme.bgColor
             val colorAnim = ValueAnimator.ofArgb(from, theme.bgColor).apply {
@@ -329,7 +327,6 @@ class MainActivity : AppCompatActivity() {
             binding.rootLayout.setBackgroundColor(theme.bgColor)
         }
 
-        // Update accent-colored elements
         binding.fetchBtn.setColorFilter(theme.accentColor)
         binding.artGlow.setBackgroundColor(theme.accentColor)
         binding.visualizer.setAccentColor(theme.accentColor)
@@ -337,13 +334,11 @@ class MainActivity : AppCompatActivity() {
         binding.progressBar.indeterminateTintList =
             android.content.res.ColorStateList.valueOf(theme.accentColor)
 
-        // Play button background
         val playBg = GradientDrawable()
         playBg.shape = GradientDrawable.OVAL
         playBg.setColor(Color.WHITE)
         binding.playPauseBtn.background = playBg
 
-        // SeekBars in settings
         listOf(binding.eqLow, binding.eqMid, binding.eqHigh).forEach { sb ->
             sb.progressTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
             sb.thumbTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
@@ -412,14 +407,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
-    // VISUALIZER
+    // VISUALIZER & EQ
     // ─────────────────────────────────────────────
 
-   private fun startVisualizer() {
-    val exoPlayer = (player as? androidx.media3.exoplayer.ExoPlayer) ?: return
-    val audioSessionId = exoPlayer.audioSessionId
-    if (audioSessionId == 0) return
-
+    private fun startVisualizer() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
+            return
+        }
+        val exoPlayer = (player as? androidx.media3.exoplayer.ExoPlayer) ?: return
+        val audioSessionId = exoPlayer.audioSessionId
+        if (audioSessionId == 0) return
         try {
             androidVisualizer?.release()
             androidVisualizer = Visualizer(audioSessionId).apply {
@@ -435,8 +435,25 @@ class MainActivity : AppCompatActivity() {
                 }, Visualizer.getMaxCaptureRate() / 2, false, true)
                 enabled = true
             }
+            initEqualizer(audioSessionId)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun initEqualizer(audioSessionId: Int) {
+        try {
+            equalizer?.release()
+            equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            startVisualizer()
         }
     }
 
@@ -444,6 +461,8 @@ class MainActivity : AppCompatActivity() {
         androidVisualizer?.enabled = false
         androidVisualizer?.release()
         androidVisualizer = null
+        equalizer?.release()
+        equalizer = null
         binding.visualizer.clear()
     }
 
@@ -639,7 +658,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
-    // DOWNLOAD (preserved from original)
+    // DOWNLOAD
     // ─────────────────────────────────────────────
 
     private fun startDownload() {
@@ -649,7 +668,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Hide keyboard
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
 
@@ -669,18 +687,15 @@ class MainActivity : AppCompatActivity() {
                 setStatus("done ✓ adding to queue…", StatusType.SUCCESS)
                 val uri = saveToDownloads(result)
                 if (uri != null) {
-                    // Resolve title from filename
                     val file = File(result)
                     val title = file.nameWithoutExtension
                         .replace('_', ' ').replace('-', ' ').trim()
                     val newTrack = Track(uri = uri, title = title)
 
-                    // Add to top of queue (most recent download plays next)
                     tracks.add(0, newTrack)
                     currentIndex = if (currentIndex >= 0) currentIndex + 1 else -1
                     trackAdapter.updateTracks(tracks)
 
-                    // Auto-play if nothing is playing
                     if (player?.isPlaying == false) {
                         loadTrack(0)
                     }
@@ -703,10 +718,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Copies downloaded tmp file to public Downloads.
-     * Returns the MediaStore URI so the player can immediately reference it.
-     */
     private fun saveToDownloads(srcPath: String): Uri? {
         val src = File(srcPath)
         if (!src.exists()) return null
@@ -745,7 +756,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
-    // UPDATE CHECK (preserved)
+    // UPDATE CHECK
     // ─────────────────────────────────────────────
 
     private fun checkForUpdate() {
