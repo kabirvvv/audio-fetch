@@ -28,6 +28,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.palette.graphics.Palette
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -554,10 +555,58 @@ private fun initEqualizer(audioSessionId: Int) {
     // UI UPDATES
     // ─────────────────────────────────────────────
 
-    private fun setTrackInfo(track: Track, index: Int) {
-        binding.trackTitle.text = track.title
-        binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
+  private fun setTrackInfo(track: Track, index: Int) {
+    binding.trackTitle.text = track.title
+    binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
+    loadAlbumArt(track.uri)
+}
+
+private fun loadAlbumArt(uri: Uri) {
+    lifecycleScope.launch(Dispatchers.IO) {
+        val bitmap = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // API 29+: use ContentResolver thumbnail (works for both
+                // MediaStore.Audio.Media and MediaStore.Downloads URIs)
+                contentResolver.loadThumbnail(
+                    uri,
+                    android.util.Size(512, 512),
+                    null
+                )
+            } else {
+                // API < 29: extract art via MediaMetadataRetriever
+                android.media.MediaMetadataRetriever().use { mmr ->
+                    mmr.setDataSource(this@MainActivity, uri)
+                    val raw = mmr.embeddedPicture ?: return@use null
+                    android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
+
+        withContext(Dispatchers.Main) {
+            if (bitmap != null) {
+                binding.albumArt.setImageBitmap(bitmap)
+                // Pulse the glow with the dominant color from the art
+                androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
+                    val swatch = palette?.dominantSwatch
+                        ?: palette?.vibrantSwatch
+                        ?: palette?.mutedSwatch
+                    if (swatch != null) {
+                        binding.artGlow.setBackgroundColor(swatch.rgb)
+                    }
+                }
+            } else {
+                // No art found — reset to default placeholder
+                binding.albumArt.setImageResource(0)
+                binding.albumArt.background = ContextCompat.getDrawable(
+                    this@MainActivity, R.drawable.bg_album_art_default
+                )
+                binding.artGlow.setBackgroundColor(currentTheme.accentColor)
+            }
+        }
     }
+}
 
     private fun updatePlayPauseIcon(playing: Boolean) {
         binding.playIcon.visibility = if (playing) View.GONE else View.VISIBLE
