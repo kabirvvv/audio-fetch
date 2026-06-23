@@ -3,22 +3,24 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.chaquo.python")
 }
+
 android {
     namespace = "com.audiofetch"
     compileSdk = 34
+
     defaultConfig {
         applicationId = "com.audiofetch"
         minSdk = 24
         targetSdk = 34
+
         versionCode = 10
         versionName = "10"
-    buildFeatures { viewBinding = true; buildConfig = true }
 
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += "arm64-v8a"
         }
     }
-    // --- NEW: signing config for release builds ---
+
     signingConfigs {
         create("release") {
             storeFile = file("release.keystore")
@@ -27,46 +29,56 @@ android {
             keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
         }
     }
-    // --- END NEW ---
+
     buildTypes {
         release {
             isMinifyEnabled = false
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release") // NEW
+
+            signingConfig = signingConfigs.getByName("release")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
+
     buildFeatures {
         viewBinding = true
         buildConfig = true
     }
 }
-// Chaquopy 15+ uses a top-level chaquopy {} block, not python {} inside defaultConfig
+
 chaquopy {
     defaultConfig {
         version = "3.13"
+
         pip {
             install("yt-dlp")
             install("mutagen")
         }
     }
 }
+
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
+
     implementation("androidx.palette:palette-ktx:1.0.0")
 }
