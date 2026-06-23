@@ -415,9 +415,10 @@ class MainActivity : AppCompatActivity() {
     // VISUALIZER
     // ─────────────────────────────────────────────
 
-    private fun startVisualizer() {
-        val audioSessionId = player?.audioSessionId ?: return
-        if (audioSessionId == 0) return
+   private fun startVisualizer() {
+    val exoPlayer = (player as? androidx.media3.exoplayer.ExoPlayer) ?: return
+    val audioSessionId = exoPlayer.audioSessionId
+    if (audioSessionId == 0) return
 
         try {
             androidVisualizer?.release()
