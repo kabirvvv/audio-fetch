@@ -94,6 +94,24 @@ class MainActivity : AppCompatActivity() {
         applyTheme(currentTheme, animate = false)
         connectPlayer()
 
+        // Request READ_MEDIA_AUDIO permission — scan only after it's granted
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO)
+            == PackageManager.PERMISSION_GRANTED) {
+            scanAndLoadTracks()
+        } else {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.READ_MEDIA_AUDIO),
+                1002
+            )
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // TRACK SCANNING
+    // ─────────────────────────────────────────────
+
+    private fun scanAndLoadTracks() {
         lifecycleScope.launch {
             val scanned = withContext(Dispatchers.IO) { MusicScanner.scanDownloads(this@MainActivity) }
             if (scanned.isNotEmpty()) {
@@ -411,46 +429,50 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
     // VISUALIZER & EQ
     // ─────────────────────────────────────────────
-private fun startVisualizer() {
-    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-        != PackageManager.PERMISSION_GRANTED) {
-        ActivityCompat.requestPermissions(this,
-            arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
-        return
-    }
 
-    val audioSessionId = PlayerService.audioSessionId
-    Log.d("VIBE", "audioSessionId = ${PlayerService.audioSessionId}")
-    if (audioSessionId == 0) {
-        // Session not ready yet — retry in 500ms
-        uiHandler.postDelayed({ startVisualizer() }, 500)
-        return
-    }
-
-    try {
-        androidVisualizer?.release()
-        androidVisualizer = Visualizer(audioSessionId).apply {
-            captureSize = Visualizer.getCaptureSizeRange()[1]
-            setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                override fun onWaveFormDataCapture(v: Visualizer, waveform: ByteArray, sr: Int) {}
-                override fun onFftDataCapture(v: Visualizer, fft: ByteArray, sr: Int) {
-                    runOnUiThread {
-                        binding.visualizer.updateFft(fft)
-                        updateGlow(fft)
-                    }
-                }
-            }, Visualizer.getMaxCaptureRate() / 2, false, true)
-            enabled = true
+    private fun startVisualizer() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
+            return
         }
-        initEqualizer(audioSessionId)
-    } catch (e: Exception) {
-        e.printStackTrace()
+
+        val audioSessionId = PlayerService.audioSessionId
+        Log.d("VIBE", "audioSessionId = ${PlayerService.audioSessionId}")
+        if (audioSessionId == 0) {
+            uiHandler.postDelayed({ startVisualizer() }, 500)
+            return
+        }
+
+        try {
+            androidVisualizer?.release()
+            androidVisualizer = Visualizer(audioSessionId).apply {
+                captureSize = Visualizer.getCaptureSizeRange()[1]
+                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(v: Visualizer, waveform: ByteArray, sr: Int) {}
+                    override fun onFftDataCapture(v: Visualizer, fft: ByteArray, sr: Int) {
+                        runOnUiThread {
+                            binding.visualizer.updateFft(fft)
+                            updateGlow(fft)
+                        }
+                    }
+                }, Visualizer.getMaxCaptureRate() / 2, false, true)
+                enabled = true
+            }
+            initEqualizer(audioSessionId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
-}
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             startVisualizer()
+        }
+        if (requestCode == 1002 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            scanAndLoadTracks()
         }
     }
 
@@ -462,413 +484,19 @@ private fun startVisualizer() {
         equalizer = null
         binding.visualizer.clear()
     }
+
     private fun initEqualizer(audioSessionId: Int) {
-    try {
-        equalizer?.release()
-        equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
-    } catch (e: Exception) {
-        e.printStackTrace()
+        try {
+            equalizer?.release()
+            equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
-}
 
     private fun updateGlow(fft: ByteArray) {
         if (fft.isEmpty()) return
         val energy = fft.take(20).sumOf { (it.toInt() and 0xFF) } / 20f / 255f
         val targetAlpha = (0.3f + energy * 0.7f).coerceIn(0f, 1f)
         binding.artGlow.animate()
-            .alpha(targetAlpha)
-            .scaleX(1.1f + energy * 0.15f)
-            .scaleY(1.1f + energy * 0.15f)
-            .setDuration(80)
-            .start()
-    }
-
-    // ─────────────────────────────────────────────
-    // PLAYBACK CONTROLS
-    // ─────────────────────────────────────────────
-
-    private fun loadTrack(index: Int) {
-        if (index < 0 || index >= tracks.size) return
-        currentIndex = index
-        val track = tracks[index]
-        setTrackInfo(track, index)
-        trackAdapter.setNowPlaying(index)
-
-        player?.let { p ->
-            p.clearMediaItems()
-            tracks.forEach { t ->
-                p.addMediaItem(MediaItem.fromUri(t.uri))
-            }
-            p.seekTo(index, 0)
-            p.prepare()
-            p.play()
-        }
-    }
-
-    private fun togglePlayPause() {
-        val p = player ?: return
-        if (tracks.isEmpty()) return
-        if (p.isPlaying) {
-            p.pause()
-            stopVisualizer()
-        } else {
-            if (currentIndex < 0 && tracks.isNotEmpty()) loadTrack(0)
-            else p.play()
-        }
-    }
-
-    private fun playNext() {
-        val next = currentIndex + 1
-        if (next < tracks.size) loadTrack(next)
-        else if (repeatMode == Player.REPEAT_MODE_ALL) loadTrack(0)
-    }
-
-    private fun playPrev() {
-        val prev = currentIndex - 1
-        if (prev >= 0) loadTrack(prev)
-        else if (repeatMode == Player.REPEAT_MODE_ALL) loadTrack(tracks.size - 1)
-    }
-
-    private fun cycleRepeat() {
-        repeatMode = when (repeatMode) {
-            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_OFF
-        }
-        player?.repeatMode = repeatMode
-        binding.repeatBtn.alpha = if (repeatMode == Player.REPEAT_MODE_OFF) 0.4f else 1f
-        binding.repeatBtn.setColorFilter(
-            if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
-            else Color.argb(153, 255, 255, 255)
-        )
-    }
-
-    private fun clearQueue() {
-        tracks.clear()
-        currentIndex = -1
-        player?.clearMediaItems()
-        player?.stop()
-        stopVisualizer()
-        trackAdapter.updateTracks(emptyList())
-        binding.trackTitle.text = "Vibe Check"
-        binding.trackArtist.text = "Queue cleared"
-        updatePlayPauseIcon(false)
-        animateAlbumArt(false)
-    }
-
-    // ─────────────────────────────────────────────
-    // UI UPDATES
-    // ─────────────────────────────────────────────
-
-  private fun setTrackInfo(track: Track, index: Int) {
-    binding.trackTitle.text = track.title
-    binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
-    loadAlbumArt(track.uri)
-}
-
-private fun loadAlbumArt(uri: Uri) {
-    lifecycleScope.launch(Dispatchers.IO) {
-        val bitmap = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // API 29+: use ContentResolver thumbnail (works for both
-                // MediaStore.Audio.Media and MediaStore.Downloads URIs)
-                contentResolver.loadThumbnail(
-                    uri,
-                    android.util.Size(512, 512),
-                    null
-                )
-            } else {
-                // API < 29: extract art via MediaMetadataRetriever
-                android.media.MediaMetadataRetriever().use { mmr ->
-                    mmr.setDataSource(this@MainActivity, uri)
-                    val raw = mmr.embeddedPicture ?: return@use null
-                    android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
-                }
-            }
-        } catch (e: Exception) {
-            null
-        }
-
-        withContext(Dispatchers.Main) {
-            if (bitmap != null) {
-                binding.albumArt.setImageBitmap(bitmap)
-                // Pulse the glow with the dominant color from the art
-                androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
-                    val swatch = palette?.dominantSwatch
-                        ?: palette?.vibrantSwatch
-                        ?: palette?.mutedSwatch
-                    if (swatch != null) {
-                        binding.artGlow.setBackgroundColor(swatch.rgb)
-                    }
-                }
-            } else {
-                // No art found — reset to default placeholder
-                binding.albumArt.setImageResource(0)
-                binding.albumArt.background = ContextCompat.getDrawable(
-                    this@MainActivity, R.drawable.bg_album_art_default
-                )
-                binding.artGlow.setBackgroundColor(currentTheme.accentColor)
-            }
-        }
-    }
-}
-
-    private fun updatePlayPauseIcon(playing: Boolean) {
-        binding.playIcon.visibility = if (playing) View.GONE else View.VISIBLE
-        binding.pauseIcon.visibility = if (playing) View.VISIBLE else View.GONE
-    }
-
-    private fun updateProgressUI() {
-        val p = player ?: return
-        val duration = p.duration.takeIf { it > 0 } ?: return
-        val pos = p.currentPosition
-        val fraction = pos.toFloat() / duration.toFloat()
-
-        binding.seekBar.progress = fraction
-        binding.currentTime.text = formatTime(pos)
-        binding.totalTime.text = formatTime(duration)
-    }
-
-    private fun animateAlbumArt(playing: Boolean) {
-        binding.albumArt.animate()
-            .scaleX(if (playing) 1.04f else 1f)
-            .scaleY(if (playing) 1.04f else 1f)
-            .setDuration(400)
-            .setInterpolator(DecelerateInterpolator())
-            .start()
-
-        if (!playing) {
-            binding.artGlow.animate().alpha(0f).setDuration(600).start()
-        }
-    }
-
-    private fun formatTime(ms: Long): String {
-        val s = ms / 1000
-        val m = s / 60
-        val sec = s % 60
-        return "$m:${sec.toString().padStart(2, '0')}"
-    }
-
-    // ─────────────────────────────────────────────
-    // PANEL ANIMATIONS
-    // ─────────────────────────────────────────────
-
-    private fun showPlaylist() {
-        trackAdapter.updateTracks(tracks)
-        binding.scrim.visibility = View.VISIBLE
-        binding.playlistSheet.visibility = View.VISIBLE
-        binding.scrim.animate().alpha(0.6f).setDuration(300).start()
-        binding.playlistSheet.animate()
-            .translationY(0f).setDuration(400)
-            .setInterpolator(DecelerateInterpolator(2f)).start()
-    }
-
-    private fun hidePlaylist() {
-        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
-            binding.scrim.visibility = View.GONE
-        }.start()
-        binding.playlistSheet.animate()
-            .translationY(binding.playlistSheet.height.toFloat() + 100f)
-            .setDuration(300).withEndAction {
-                binding.playlistSheet.visibility = View.GONE
-            }.start()
-    }
-
-    private fun showSettings() {
-        binding.scrim.visibility = View.VISIBLE
-        binding.settingsPanel.visibility = View.VISIBLE
-        binding.scrim.animate().alpha(0.6f).setDuration(300).start()
-        binding.settingsPanel.animate()
-            .translationX(0f).setDuration(400)
-            .setInterpolator(DecelerateInterpolator(2f)).start()
-    }
-
-    private fun hideSettings() {
-        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
-            binding.scrim.visibility = View.GONE
-        }.start()
-        binding.settingsPanel.animate()
-            .translationX(binding.settingsPanel.width.toFloat())
-            .setDuration(300).withEndAction {
-                binding.settingsPanel.visibility = View.GONE
-            }.start()
-    }
-
-    // ─────────────────────────────────────────────
-    // SLEEP TIMER
-    // ─────────────────────────────────────────────
-
-    private fun setSleepTimer(minutes: Int) {
-        sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
-        if (minutes <= 0) return
-        sleepTimerHandler = Handler(Looper.getMainLooper())
-        sleepTimerRunnable = Runnable {
-            player?.pause()
-            stopVisualizer()
-        }
-        sleepTimerHandler?.postDelayed(sleepTimerRunnable!!, minutes * 60 * 1000L)
-        setStatus("Sleep timer: ${minutes}m", StatusType.NEUTRAL)
-    }
-
-    // ─────────────────────────────────────────────
-    // DOWNLOAD
-    // ─────────────────────────────────────────────
-
-    private fun startDownload() {
-        val input = binding.urlInput.text?.toString()?.trim() ?: ""
-        if (input.isEmpty()) {
-            setStatus("no url or search term provided.", StatusType.ERROR)
-            return
-        }
-
-        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
-            .hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
-
-        setStatus("fetching… this may take a moment.", StatusType.NEUTRAL)
-        binding.fetchBtn.isEnabled = false
-        binding.progressBar.isVisible = true
-
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runDownload(input) }
-
-            binding.fetchBtn.isEnabled = true
-            binding.progressBar.isVisible = false
-
-            if (result.startsWith("ERROR:")) {
-                setStatus(result, StatusType.ERROR)
-            } else {
-                setStatus("done ✓ adding to queue…", StatusType.SUCCESS)
-                val uri = saveToDownloads(result)
-                if (uri != null) {
-                    val file = File(result)
-                    val title = file.nameWithoutExtension
-                        .replace('_', ' ').replace('-', ' ').trim()
-                    val newTrack = Track(uri = uri, title = title)
-
-                    tracks.add(0, newTrack)
-                    currentIndex = if (currentIndex >= 0) currentIndex + 1 else -1
-                    trackAdapter.updateTracks(tracks)
-
-                    if (player?.isPlaying == false) {
-                        loadTrack(0)
-                    }
-
-                    binding.urlInput.text?.clear()
-                    setStatus("added: $title", StatusType.SUCCESS)
-                }
-            }
-        }
-    }
-
-    private fun runDownload(url: String): String {
-        return try {
-            val py = Python.getInstance()
-            val module = py.getModule("main")
-            val tmpDir = cacheDir.absolutePath
-            module.callAttr("download_audio", url, tmpDir).toString()
-        } catch (e: Exception) {
-            "ERROR: ${e.message}"
-        }
-    }
-
-    private fun saveToDownloads(srcPath: String): Uri? {
-        val src = File(srcPath)
-        if (!src.exists()) return null
-
-        val mimeType = when (src.extension.lowercase()) {
-            "mp3" -> "audio/mpeg"
-            "m4a" -> "audio/mp4"
-            "opus" -> "audio/opus"
-            "webm" -> "audio/webm"
-            else -> "audio/*"
-        }
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, src.name)
-                put(MediaStore.Downloads.MIME_TYPE, mimeType)
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
-            val resolver = contentResolver
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return null
-            resolver.openOutputStream(uri)?.use { out -> src.inputStream().copyTo(out) }
-            values.clear()
-            values.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(uri, values, null, null)
-            src.delete()
-            uri
-        } else {
-            val destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            destDir.mkdirs()
-            val dest = File(destDir, src.name)
-            src.copyTo(dest, overwrite = true)
-            src.delete()
-            Uri.fromFile(dest)
-        }
-    }
-
-    // ─────────────────────────────────────────────
-    // UPDATE CHECK
-    // ─────────────────────────────────────────────
-
-    private fun checkForUpdate() {
-        lifecycleScope.launch {
-            val update = withContext(Dispatchers.IO) {
-                UpdateChecker.checkForUpdate(BuildConfig.VERSION_CODE)
-            }
-            if (update != null) {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Update available — ${update.versionName}")
-                    .setMessage(update.changelog)
-                    .setPositiveButton("Update Now") { _, _ ->
-                        UpdateChecker.downloadAndInstall(this@MainActivity, update)
-                    }
-                    .setNeutralButton("View on GitHub") { _, _ ->
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
-                    }
-                    .setNegativeButton("Later", null)
-                    .show()
-            }
-        }
-    }
-
-    // ─────────────────────────────────────────────
-    // STATUS
-    // ─────────────────────────────────────────────
-
-    private enum class StatusType { NEUTRAL, ERROR, SUCCESS }
-
-    private fun setStatus(msg: String, type: StatusType) {
-        binding.statusText.text = msg
-        binding.statusText.setTextColor(
-            getColor(when (type) {
-                StatusType.ERROR -> R.color.status_error
-                StatusType.SUCCESS -> R.color.status_success
-                StatusType.NEUTRAL -> R.color.status_muted
-            })
-        )
-    }
-
-    // ─────────────────────────────────────────────
-    // LIFECYCLE
-    // ─────────────────────────────────────────────
-
-    override fun onResume() {
-        super.onResume()
-        if (player?.isPlaying == true) uiHandler.post(uiRunnable)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        uiHandler.removeCallbacks(uiRunnable)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        uiHandler.removeCallbacks(uiRunnable)
-        stopVisualizer()
-        controllerFuture?.let { MediaController.releaseFuture(it) }
-        sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
-    }
-}
+            .alpha(t
