@@ -141,6 +141,12 @@ class MainActivity : AppCompatActivity() {
             adapter = libraryAdapter
         }
 
+        // ── Playlist detail recycler (reuses libraryAdapter) ──────────────────
+        binding.playlistDetailRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = libraryAdapter
+        }
+
         playlistsAdapter = PlaylistsAdapter(emptyList(), ::openPlaylist, ::onPlaylistLongPress)
         binding.playlistsRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
@@ -248,23 +254,17 @@ class MainActivity : AppCompatActivity() {
     private fun openPlaylist(playlist: Playlist) {
         openPlaylist = playlist
         binding.playlistDetailTitle.text = playlist.name
-        binding.libraryTabsRow.visibility = View.GONE
-        binding.playlistsSection.visibility = View.GONE
+        binding.libraryNormalSection.visibility = View.GONE
         binding.playlistDetailSection.visibility = View.VISIBLE
-        binding.backFromPlaylistBtn.visibility = View.VISIBLE
-
-        val tracks = LibraryManager.getPlaylistTracks(playlist)
-        libraryAdapter.update(tracks)
-        binding.libraryRecycler.visibility = View.VISIBLE
+        libraryAdapter.update(LibraryManager.getPlaylistTracks(playlist))
     }
 
     private fun closeOpenPlaylist() {
         openPlaylist = null
-        binding.libraryTabsRow.visibility = View.VISIBLE
-        binding.playlistsSection.visibility = View.VISIBLE
         binding.playlistDetailSection.visibility = View.GONE
-        binding.backFromPlaylistBtn.visibility = View.GONE
+        binding.libraryNormalSection.visibility = View.VISIBLE
         refreshLibraryTab()
+        refreshPlaylists()
     }
 
     // ─────────────────────────────────────────────
@@ -282,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         showPlayerTab()
     }
 
-    private fun onLibraryTrackLongPress(track: Track, anchor: View) {
+    private fun onLibraryTrackLongPress(track: Track, _anchor: View) {
         val options = mutableListOf("Add to Queue", "Add to Playlist")
         if (currentLibTab == 0) options.add("Remove from Downloads")
         if (currentLibTab == 1) options.add("Remove from Local")
@@ -299,7 +299,6 @@ class MainActivity : AppCompatActivity() {
                         refreshLibraryTab()
                     }
                     "Remove from Local" -> {
-                        // local is re-scanned, just remove from in-memory list for now
                         val updated = LibraryManager.getLocal().filter { it.uri != track.uri }
                         LibraryManager.setLocal(this, updated)
                         refreshLibraryTab()
@@ -362,7 +361,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null).show()
     }
 
-    private fun onPlaylistLongPress(playlist: Playlist, anchor: View) {
+    private fun onPlaylistLongPress(playlist: Playlist, _anchor: View) {
         val options = arrayOf("Rename", "Delete")
         AlertDialog.Builder(this)
             .setTitle(playlist.name)
@@ -403,22 +402,13 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun onQueueReordered(from: Int, to: Int) {
-        // Keep currentIndex pointing at the same track after reorder
         currentIndex = when {
             from == currentIndex -> to
             from < currentIndex && to >= currentIndex -> currentIndex - 1
             from > currentIndex && to <= currentIndex -> currentIndex + 1
             else -> currentIndex
         }
-        // Rebuild ExoPlayer queue
-        player?.let { p ->
-            val wasPlaying = p.isPlaying
-            val pos = p.currentPosition
-            p.clearMediaItems()
-            tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
-            p.seekTo(currentIndex, pos)
-            if (wasPlaying) p.prepare()
-        }
+        player?.moveMediaItem(from, to)
     }
 
     // ─────────────────────────────────────────────
@@ -627,7 +617,7 @@ class MainActivity : AppCompatActivity() {
                 val idx = player?.currentMediaItemIndex ?: return
                 if (idx >= 0 && idx < tracks.size) {
                     currentIndex = idx
-                    setTrackInfo(tracks[idx], idx)
+                    setTrackInfo(tracks[idx])
                     trackAdapter.setNowPlaying(idx)
                     LibraryManager.addToHistory(this@MainActivity, tracks[idx])
                 }
@@ -700,7 +690,7 @@ class MainActivity : AppCompatActivity() {
         if (index < 0 || index >= tracks.size) return
         currentIndex = index
         val track = tracks[index]
-        setTrackInfo(track, index)
+        setTrackInfo(track)
         trackAdapter.setNowPlaying(index)
         player?.let { p ->
             p.clearMediaItems()
@@ -753,7 +743,7 @@ class MainActivity : AppCompatActivity() {
     // UI UPDATES
     // ─────────────────────────────────────────────
 
-    private fun setTrackInfo(track: Track, index: Int) {
+    private fun setTrackInfo(track: Track) {
         binding.trackTitle.text = track.title
         binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
         loadAlbumArt(track.uri)
