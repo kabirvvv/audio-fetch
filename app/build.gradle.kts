@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 34
 
-        versionCode = 19
+        versionCode = 20
         versionName = "2.1"
 
         ndk {
