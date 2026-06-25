@@ -319,68 +319,52 @@
 
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════
-         LIBRARY CONTAINER (hidden by default)
-         ═══════════════════════════════════════════ -->
-    <LinearLayout
-        android:id="@+id/libraryContainer"
+<!-- ═══════════════════════════════════════════
+     LIBRARY CONTAINER (hidden by default)
+     ═══════════════════════════════════════════ -->
+<LinearLayout
+    android:id="@+id/libraryContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#020503"
+    android:paddingBottom="56dp"
+    android:visibility="gone">
+
+    <!-- Header -->
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="#020503"
-        android:paddingBottom="56dp"
-        android:visibility="gone">
+        android:layout_height="56dp"
+        android:paddingHorizontal="16dp">
 
-        <!-- Header -->
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:paddingHorizontal="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:text="Library"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/libraryCloseBtn"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_close"
-                android:tint="#60FFFFFF"
-                android:contentDescription="Close library" />
-        </RelativeLayout>
-
-        <!-- Back button — visible when inside a playlist -->
-        <Button
-            android:id="@+id/backFromPlaylistBtn"
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginBottom="4dp"
-            android:text="← Back"
+            android:layout_centerVertical="true"
+            android:text="Library"
             android:textColor="#FFFFFF"
-            android:backgroundTint="@android:color/transparent"
-            android:visibility="gone" />
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
-        <!-- Playlist detail title — visible when inside a playlist -->
-        <TextView
-            android:id="@+id/playlistDetailTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="8dp"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+        <ImageButton
+            android:id="@+id/libraryCloseBtn"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_close"
+            android:tint="#60FFFFFF"
+            android:contentDescription="Close library" />
+    </RelativeLayout>
+
+    <!-- ── NORMAL LIBRARY VIEW (tabs + tracks + playlists) ── -->
+    <LinearLayout
+        android:id="@+id/libraryNormalSection"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <!-- Library tab row -->
         <LinearLayout
@@ -429,7 +413,7 @@
             android:background="#20FFFFFF"
             android:layout_marginBottom="4dp" />
 
-        <!-- Library track list -->
+        <!-- Library track list — takes remaining space above playlists -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/libraryRecycler"
             android:layout_width="match_parent"
@@ -446,11 +430,12 @@
             android:layout_height="1dp"
             android:background="#20FFFFFF" />
 
-        <!-- Playlists section -->
+        <!-- Playlists section — fixed height, scrollable -->
         <LinearLayout
             android:id="@+id/playlistsSection"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="0.6"
             android:orientation="vertical">
 
             <RelativeLayout
@@ -483,32 +468,71 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/playlistsRecycler"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:maxHeight="200dp"
-                android:nestedScrollingEnabled="false"
-                android:scrollbars="none" />
-
-        </LinearLayout>
-
-        <!-- Playlist detail section — shown when a playlist is open -->
-        <LinearLayout
-            android:id="@+id/playlistDetailSection"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/playlistDetailRecycler"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:nestedScrollingEnabled="true"
                 android:scrollbars="none"
                 android:overScrollMode="never" />
 
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- ── PLAYLIST DETAIL VIEW (replaces normal view when playlist is open) ── -->
+    <LinearLayout
+        android:id="@+id/playlistDetailSection"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Back button + title row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingBottom="4dp">
+
+            <Button
+                android:id="@+id/backFromPlaylistBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="← Back"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="@android:color/transparent" />
+
+            <TextView
+                android:id="@+id/playlistDetailTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingHorizontal="8dp"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#20FFFFFF"
+            android:layout_marginBottom="4dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/playlistDetailRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:scrollbars="none"
+            android:overScrollMode="never" />
+
+    </LinearLayout>
+
+</LinearLayout>
 
     <!-- ═══════════════════════════════════════════
          BOTTOM NAV
