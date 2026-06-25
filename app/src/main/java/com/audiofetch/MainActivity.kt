@@ -1,4 +1,3 @@
-
 package com.audiofetch
 
 import android.util.Log
@@ -30,11 +29,11 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import androidx.palette.graphics.Palette
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.audiofetch.databinding.ActivityMainBinding
 import com.chaquo.python.Python
@@ -71,17 +70,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var trackAdapter: TrackAdapter
+    private lateinit var libraryAdapter: LibraryAdapter
+    private lateinit var playlistsAdapter: PlaylistsAdapter
+
+    // currently open playlist (null = showing library tabs)
+    private var openPlaylist: Playlist? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        LibraryManager.init(this)
         checkForUpdate()
 
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-        }
+        if (!Python.isStarted()) Python.start(AndroidPlatform(this))
 
         val savedThemeId = getSharedPreferences("vibe", MODE_PRIVATE)
             .getString("theme", "emerald") ?: "emerald"
@@ -91,30 +94,26 @@ class MainActivity : AppCompatActivity() {
         applyTheme(currentTheme, animate = false)
         connectPlayer()
 
+        // Scan local audio (permission gated)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO)
             == PackageManager.PERMISSION_GRANTED) {
-            scanAndLoadTracks()
+            scanLocalTracks()
         } else {
             ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.READ_MEDIA_AUDIO),
-                1002
+                this, arrayOf(Manifest.permission.READ_MEDIA_AUDIO), 1002
             )
         }
     }
 
     // ─────────────────────────────────────────────
-    // TRACK SCANNING
+    // LOCAL SCAN
     // ─────────────────────────────────────────────
 
-    private fun scanAndLoadTracks() {
+    private fun scanLocalTracks() {
         lifecycleScope.launch {
             val scanned = withContext(Dispatchers.IO) { MusicScanner.scanDownloads(this@MainActivity) }
-            if (scanned.isNotEmpty()) {
-                tracks.addAll(scanned)
-                trackAdapter.updateTracks(tracks)
-                if (currentIndex < 0) setTrackInfo(tracks[0], -1)
-            }
+            LibraryManager.setLocal(this@MainActivity, scanned)
+            refreshLibraryTab()
         }
     }
 
@@ -123,45 +122,333 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun setupUI() {
+        // ── Queue (existing playlist sheet) ──────────────────────────────────
         trackAdapter = TrackAdapter(mutableListOf(), ::loadTrack)
+        trackAdapter.onTrackMoved = { from, to -> onQueueReordered(from, to) }
+        val dragCallback = DragDropCallback(trackAdapter)
+        val itemTouchHelper = ItemTouchHelper(dragCallback)
+        trackAdapter.itemTouchHelper = itemTouchHelper
         binding.playlistRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = trackAdapter
         }
+        itemTouchHelper.attachToRecyclerView(binding.playlistRecycler)
 
+        // ── Library sheet ─────────────────────────────────────────────────────
+        libraryAdapter = LibraryAdapter(emptyList(), ::playFromLibrary, ::onLibraryTrackLongPress)
+        binding.libraryRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = libraryAdapter
+        }
+
+        playlistsAdapter = PlaylistsAdapter(emptyList(), ::openPlaylist, ::onPlaylistLongPress)
+        binding.playlistsRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = playlistsAdapter
+        }
+
+        // ── Library tab buttons ───────────────────────────────────────────────
+        binding.libTabDownloads.setOnClickListener { selectLibraryTab(0) }
+        binding.libTabLocal.setOnClickListener     { selectLibraryTab(1) }
+        binding.libTabHistory.setOnClickListener   { selectLibraryTab(2) }
+        binding.newPlaylistBtn.setOnClickListener  { promptCreatePlaylist() }
+        binding.backFromPlaylistBtn.setOnClickListener { closeOpenPlaylist() }
+
+        // ── Bottom nav ────────────────────────────────────────────────────────
+        binding.navPlayer.setOnClickListener  { showPlayerTab() }
+        binding.navLibrary.setOnClickListener { showLibraryTab() }
+
+        // ── Player controls ───────────────────────────────────────────────────
         binding.fetchBtn.setOnClickListener { startDownload() }
         binding.urlInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) { startDownload(); true } else false
         }
-
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
         binding.nextBtn.setOnClickListener { playNext() }
         binding.prevBtn.setOnClickListener { playPrev() }
         binding.repeatBtn.setOnClickListener { cycleRepeat() }
 
         binding.seekBar.onSeek = { fraction ->
-            player?.let { p ->
-                val pos = (fraction * p.duration).toLong()
-                p.seekTo(pos)
-            }
+            player?.let { p -> p.seekTo((fraction * p.duration).toLong()) }
         }
 
-        binding.playlistBtn.setOnClickListener { showPlaylist() }
-        binding.closePlaylistBtn.setOnClickListener { hidePlaylist() }
+        binding.playlistBtn.setOnClickListener { showQueueSheet() }
+        binding.closePlaylistBtn.setOnClickListener { hideQueueSheet() }
         binding.clearQueueBtn.setOnClickListener { clearQueue() }
 
         binding.menuBtn.setOnClickListener { showSettings() }
         binding.closeSettingsBtn.setOnClickListener { hideSettings() }
 
+        binding.libraryCloseBtn.setOnClickListener { showPlayerTab() }
+
         binding.scrim.setOnClickListener {
-            hidePlaylist()
+            hideQueueSheet()
             hideSettings()
         }
 
         setupEQ()
         setupTimerChips()
         setupThemeGrid()
+        selectLibraryTab(0)
     }
+
+    // ─────────────────────────────────────────────
+    // BOTTOM NAV
+    // ─────────────────────────────────────────────
+
+    private fun showPlayerTab() {
+        binding.playerContainer.visibility = View.VISIBLE
+        binding.libraryContainer.visibility = View.GONE
+        binding.navPlayer.alpha = 1f
+        binding.navLibrary.alpha = 0.4f
+    }
+
+    private fun showLibraryTab() {
+        binding.playerContainer.visibility = View.GONE
+        binding.libraryContainer.visibility = View.VISIBLE
+        binding.navPlayer.alpha = 0.4f
+        binding.navLibrary.alpha = 1f
+        refreshLibraryTab()
+        refreshPlaylists()
+    }
+
+    // ─────────────────────────────────────────────
+    // LIBRARY TABS
+    // ─────────────────────────────────────────────
+
+    private var currentLibTab = 0
+
+    private fun selectLibraryTab(tab: Int) {
+        currentLibTab = tab
+        val accent = currentTheme.accentColor
+        val dim = 0x40FFFFFF.toInt()
+        binding.libTabDownloads.setTextColor(if (tab == 0) accent else dim)
+        binding.libTabLocal.setTextColor(if (tab == 1) accent else dim)
+        binding.libTabHistory.setTextColor(if (tab == 2) accent else dim)
+        refreshLibraryTab()
+    }
+
+    private fun refreshLibraryTab() {
+        val list = when (currentLibTab) {
+            0 -> LibraryManager.getDownloads()
+            1 -> LibraryManager.getLocal()
+            else -> LibraryManager.getHistory()
+        }
+        libraryAdapter.update(list)
+    }
+
+    private fun refreshPlaylists() {
+        playlistsAdapter.update(LibraryManager.getPlaylists())
+    }
+
+    // ─────────────────────────────────────────────
+    // PLAYLIST OPEN / CLOSE
+    // ─────────────────────────────────────────────
+
+    private fun openPlaylist(playlist: Playlist) {
+        openPlaylist = playlist
+        binding.playlistDetailTitle.text = playlist.name
+        binding.libraryTabsRow.visibility = View.GONE
+        binding.playlistsSection.visibility = View.GONE
+        binding.playlistDetailSection.visibility = View.VISIBLE
+        binding.backFromPlaylistBtn.visibility = View.VISIBLE
+
+        val tracks = LibraryManager.getPlaylistTracks(playlist)
+        libraryAdapter.update(tracks)
+        binding.libraryRecycler.visibility = View.VISIBLE
+    }
+
+    private fun closeOpenPlaylist() {
+        openPlaylist = null
+        binding.libraryTabsRow.visibility = View.VISIBLE
+        binding.playlistsSection.visibility = View.VISIBLE
+        binding.playlistDetailSection.visibility = View.GONE
+        binding.backFromPlaylistBtn.visibility = View.GONE
+        refreshLibraryTab()
+    }
+
+    // ─────────────────────────────────────────────
+    // LIBRARY INTERACTIONS
+    // ─────────────────────────────────────────────
+
+    private fun playFromLibrary(track: Track) {
+        LibraryManager.addToHistory(this, track)
+        if (tracks.none { it.uri == track.uri }) {
+            tracks.add(track)
+            trackAdapter.updateTracks(tracks)
+        }
+        val idx = tracks.indexOfFirst { it.uri == track.uri }
+        loadTrack(idx)
+        showPlayerTab()
+    }
+
+    private fun onLibraryTrackLongPress(track: Track, anchor: View) {
+        val options = mutableListOf("Add to Queue", "Add to Playlist")
+        if (currentLibTab == 0) options.add("Remove from Downloads")
+        if (currentLibTab == 1) options.add("Remove from Local")
+        if (openPlaylist != null) options.add("Remove from Playlist")
+
+        AlertDialog.Builder(this)
+            .setTitle(track.title)
+            .setItems(options.toTypedArray()) { _, which ->
+                when (options[which]) {
+                    "Add to Queue" -> addToQueue(track)
+                    "Add to Playlist" -> promptAddToPlaylist(track)
+                    "Remove from Downloads" -> {
+                        LibraryManager.removeDownload(this, track)
+                        refreshLibraryTab()
+                    }
+                    "Remove from Local" -> {
+                        // local is re-scanned, just remove from in-memory list for now
+                        val updated = LibraryManager.getLocal().filter { it.uri != track.uri }
+                        LibraryManager.setLocal(this, updated)
+                        refreshLibraryTab()
+                    }
+                    "Remove from Playlist" -> {
+                        openPlaylist?.let { pl ->
+                            LibraryManager.removeTrackFromPlaylist(this, pl.id, track.uri.toString())
+                            openPlaylist(pl)
+                        }
+                    }
+                }
+            }.show()
+    }
+
+    private fun addToQueue(track: Track) {
+        if (tracks.none { it.uri == track.uri }) {
+            tracks.add(track)
+            trackAdapter.updateTracks(tracks)
+        }
+        setStatus("Added to queue: ${track.title}", StatusType.SUCCESS)
+    }
+
+    private fun promptAddToPlaylist(track: Track) {
+        val playlists = LibraryManager.getPlaylists()
+        if (playlists.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setMessage("No playlists yet. Create one first.")
+                .setPositiveButton("Create") { _, _ -> promptCreatePlaylist() }
+                .setNegativeButton("Cancel", null).show()
+            return
+        }
+        val names = playlists.map { it.name }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Add to playlist")
+            .setItems(names) { _, which ->
+                LibraryManager.addTrackToPlaylist(this, playlists[which].id, track)
+                setStatus("Added to ${playlists[which].name}", StatusType.SUCCESS)
+            }.show()
+    }
+
+    // ─────────────────────────────────────────────
+    // PLAYLIST MANAGEMENT
+    // ─────────────────────────────────────────────
+
+    private fun promptCreatePlaylist() {
+        val input = EditText(this).apply {
+            hint = "Playlist name"
+            setPadding(48, 32, 48, 16)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("New Playlist")
+            .setView(input)
+            .setPositiveButton("Create") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    LibraryManager.createPlaylist(this, name)
+                    refreshPlaylists()
+                }
+            }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun onPlaylistLongPress(playlist: Playlist, anchor: View) {
+        val options = arrayOf("Rename", "Delete")
+        AlertDialog.Builder(this)
+            .setTitle(playlist.name)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        val input = EditText(this).apply {
+                            setText(playlist.name)
+                            setPadding(48, 32, 48, 16)
+                        }
+                        AlertDialog.Builder(this)
+                            .setTitle("Rename Playlist")
+                            .setView(input)
+                            .setPositiveButton("Save") { _, _ ->
+                                val name = input.text.toString().trim()
+                                if (name.isNotEmpty()) {
+                                    LibraryManager.renamePlaylist(this, playlist.id, name)
+                                    refreshPlaylists()
+                                }
+                            }
+                            .setNegativeButton("Cancel", null).show()
+                    }
+                    1 -> {
+                        AlertDialog.Builder(this)
+                            .setMessage("Delete \"${playlist.name}\"?")
+                            .setPositiveButton("Delete") { _, _ ->
+                                LibraryManager.deletePlaylist(this, playlist.id)
+                                refreshPlaylists()
+                            }
+                            .setNegativeButton("Cancel", null).show()
+                    }
+                }
+            }.show()
+    }
+
+    // ─────────────────────────────────────────────
+    // QUEUE REORDER
+    // ─────────────────────────────────────────────
+
+    private fun onQueueReordered(from: Int, to: Int) {
+        // Keep currentIndex pointing at the same track after reorder
+        currentIndex = when {
+            from == currentIndex -> to
+            from < currentIndex && to >= currentIndex -> currentIndex - 1
+            from > currentIndex && to <= currentIndex -> currentIndex + 1
+            else -> currentIndex
+        }
+        // Rebuild ExoPlayer queue
+        player?.let { p ->
+            val wasPlaying = p.isPlaying
+            val pos = p.currentPosition
+            p.clearMediaItems()
+            tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
+            p.seekTo(currentIndex, pos)
+            if (wasPlaying) p.prepare()
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // QUEUE SHEET (was "playlist sheet")
+    // ─────────────────────────────────────────────
+
+    private fun showQueueSheet() {
+        trackAdapter.updateTracks(tracks)
+        binding.scrim.visibility = View.VISIBLE
+        binding.playlistSheet.visibility = View.VISIBLE
+        binding.scrim.animate().alpha(0.6f).setDuration(300).start()
+        binding.playlistSheet.animate()
+            .translationY(0f).setDuration(400)
+            .setInterpolator(DecelerateInterpolator(2f)).start()
+    }
+
+    private fun hideQueueSheet() {
+        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
+            binding.scrim.visibility = View.GONE
+        }.start()
+        binding.playlistSheet.animate()
+            .translationY(binding.playlistSheet.height.toFloat() + 100f)
+            .setDuration(300).withEndAction {
+                binding.playlistSheet.visibility = View.GONE
+            }.start()
+    }
+
+    // ─────────────────────────────────────────────
+    // EQ / TIMER / THEME (unchanged)
+    // ─────────────────────────────────────────────
 
     private fun setupEQ() {
         fun dBFromProgress(p: Int) = (p - 12).toFloat()
@@ -173,55 +460,39 @@ class MainActivity : AppCompatActivity() {
             val numBands = eq.numberOfBands.toInt()
             val range = eq.bandLevelRange
             val minMB = range[0]; val maxMB = range[1]
-
             fun progressToMillibels(p: Int): Short {
                 val fraction = p / 24f
                 return (minMB + (fraction * (maxMB - minMB))).toInt().toShort()
             }
-
             if (numBands >= 1) eq.setBandLevel(0, progressToMillibels(binding.eqLow.progress))
             if (numBands >= 3) eq.setBandLevel((numBands / 2).toShort(), progressToMillibels(binding.eqMid.progress))
             if (numBands >= 2) eq.setBandLevel((numBands - 1).toShort(), progressToMillibels(binding.eqHigh.progress))
         }
 
         binding.eqLow.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) {
-                binding.eqLowVal.text = label(dBFromProgress(p)); applyEQ()
-            }
+            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) { binding.eqLowVal.text = label(dBFromProgress(p)); applyEQ() }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
         binding.eqMid.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) {
-                binding.eqMidVal.text = label(dBFromProgress(p)); applyEQ()
-            }
+            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) { binding.eqMidVal.text = label(dBFromProgress(p)); applyEQ() }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
         binding.eqHigh.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) {
-                binding.eqHighVal.text = label(dBFromProgress(p)); applyEQ()
-            }
+            override fun onProgressChanged(sb: SeekBar, p: Int, u: Boolean) { binding.eqHighVal.text = label(dBFromProgress(p)); applyEQ() }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
 
         val presets = listOf("Flat", "Bass", "Pop", "Chill")
-        val presetValues = mapOf(
-            "Flat"  to Triple(12, 12, 12),
-            "Bass"  to Triple(20, 14, 10),
-            "Pop"   to Triple(14, 16, 18),
-            "Chill" to Triple(16, 10, 14)
-        )
+        val presetValues = mapOf("Flat" to Triple(12,12,12), "Bass" to Triple(20,14,10), "Pop" to Triple(14,16,18), "Chill" to Triple(16,10,14))
         presets.forEach { name ->
             val chip = buildChip(name, isActive = name == "Flat")
             chip.setOnClickListener {
-                val (l, m, h) = presetValues[name] ?: Triple(12, 12, 12)
-                binding.eqLow.progress = l
-                binding.eqMid.progress = m
-                binding.eqHigh.progress = h
-                updateChipSelection(binding.eqPresets, chip)
-                applyEQ()
+                val (l, m, h) = presetValues[name] ?: Triple(12,12,12)
+                binding.eqLow.progress = l; binding.eqMid.progress = m; binding.eqHigh.progress = h
+                updateChipSelection(binding.eqPresets, chip); applyEQ()
             }
             binding.eqPresets.addView(chip)
         }
@@ -231,10 +502,7 @@ class MainActivity : AppCompatActivity() {
         val options = listOf("Off" to 0, "30m" to 30, "1h" to 60, "2h" to 120, "3h" to 180)
         options.forEach { (label, mins) ->
             val chip = buildChip(label, isActive = mins == 0)
-            chip.setOnClickListener {
-                setSleepTimer(mins)
-                updateChipSelection(binding.timerChips, chip)
-            }
+            chip.setOnClickListener { setSleepTimer(mins); updateChipSelection(binding.timerChips, chip) }
             binding.timerChips.addView(chip)
         }
     }
@@ -243,25 +511,15 @@ class MainActivity : AppCompatActivity() {
         VibeThemes.all.forEach { theme ->
             val dot = View(this).apply {
                 val size = (48 * resources.displayMetrics.density).toInt()
-                layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                    setMargins(6, 6, 6, 6)
-                }
-                val gd = GradientDrawable(
-                    GradientDrawable.Orientation.TL_BR,
-                    intArrayOf(theme.bgColor, theme.accentColor)
-                )
+                layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(6,6,6,6) }
+                val gd = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(theme.bgColor, theme.accentColor))
                 gd.cornerRadius = size / 2f
                 background = gd
-                if (theme.id == currentTheme.id) {
-                    alpha = 1f; scaleX = 1.15f; scaleY = 1.15f
-                } else {
-                    alpha = 0.6f
-                }
+                if (theme.id == currentTheme.id) { alpha = 1f; scaleX = 1.15f; scaleY = 1.15f } else alpha = 0.6f
                 setOnClickListener {
                     applyTheme(theme, animate = true)
                     for (i in 0 until binding.themeGrid.childCount) {
-                        val v = binding.themeGrid.getChildAt(i)
-                        v.alpha = 0.6f; v.scaleX = 1f; v.scaleY = 1f
+                        val v = binding.themeGrid.getChildAt(i); v.alpha = 0.6f; v.scaleX = 1f; v.scaleY = 1f
                     }
                     alpha = 1f; scaleX = 1.15f; scaleY = 1.15f
                 }
@@ -272,27 +530,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildChip(label: String, isActive: Boolean): TextView {
         return TextView(this).apply {
-            text = label
-            textSize = 11f
-            setPadding(
-                (12 * resources.displayMetrics.density).toInt(),
-                (6 * resources.displayMetrics.density).toInt(),
-                (12 * resources.displayMetrics.density).toInt(),
-                (6 * resources.displayMetrics.density).toInt()
-            )
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, (8 * resources.displayMetrics.density).toInt(), 0) }
-            setTextColor(if (isActive) currentTheme.accentColor else Color.argb(128, 255, 255, 255))
+            text = label; textSize = 11f
+            setPadding((12*resources.displayMetrics.density).toInt(),(6*resources.displayMetrics.density).toInt(),(12*resources.displayMetrics.density).toInt(),(6*resources.displayMetrics.density).toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,(8*resources.displayMetrics.density).toInt(),0) }
+            setTextColor(if (isActive) currentTheme.accentColor else Color.argb(128,255,255,255))
             val gd = GradientDrawable()
             gd.cornerRadius = 24f * resources.displayMetrics.density
-            gd.setStroke(1, if (isActive) currentTheme.accentColor else Color.argb(40, 255, 255, 255))
-            gd.setColor(if (isActive) Color.argb(30, Color.red(currentTheme.accentColor),
-                Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor))
-            else Color.TRANSPARENT)
-            background = gd
-            isClickable = true; isFocusable = true
+            gd.setStroke(1, if (isActive) currentTheme.accentColor else Color.argb(40,255,255,255))
+            gd.setColor(if (isActive) Color.argb(30, Color.red(currentTheme.accentColor), Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor)) else Color.TRANSPARENT)
+            background = gd; isClickable = true; isFocusable = true
         }
     }
 
@@ -300,12 +546,10 @@ class MainActivity : AppCompatActivity() {
         for (i in 0 until container.childCount) {
             val chip = container.getChildAt(i) as? TextView ?: continue
             val isSelected = chip == selected
-            chip.setTextColor(if (isSelected) currentTheme.accentColor else Color.argb(128, 255, 255, 255))
+            chip.setTextColor(if (isSelected) currentTheme.accentColor else Color.argb(128,255,255,255))
             val gd = chip.background as? GradientDrawable ?: continue
-            gd.setStroke(1, if (isSelected) currentTheme.accentColor else Color.argb(40, 255, 255, 255))
-            gd.setColor(if (isSelected) Color.argb(30, Color.red(currentTheme.accentColor),
-                Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor))
-            else Color.TRANSPARENT)
+            gd.setStroke(1, if (isSelected) currentTheme.accentColor else Color.argb(40,255,255,255))
+            gd.setColor(if (isSelected) Color.argb(30, Color.red(currentTheme.accentColor), Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor)) else Color.TRANSPARENT)
         }
     }
 
@@ -316,63 +560,47 @@ class MainActivity : AppCompatActivity() {
     private fun applyTheme(theme: VibeTheme, animate: Boolean) {
         currentTheme = theme
         getSharedPreferences("vibe", MODE_PRIVATE).edit().putString("theme", theme.id).apply()
-
         if (animate) {
-            val from = (binding.bgVibe.background as? GradientDrawable)?.colors?.getOrNull(0)
-                ?: theme.bgColor
-            val colorAnim = ValueAnimator.ofArgb(from, theme.bgColor).apply {
+            val from = (binding.bgVibe.background as? GradientDrawable)?.colors?.getOrNull(0) ?: theme.bgColor
+            ValueAnimator.ofArgb(from, theme.bgColor).apply {
                 duration = 800
                 addUpdateListener { anim ->
                     val color = anim.animatedValue as Int
                     val vibe = blendColors(color, theme.vibeColor, 0.5f)
-                    val gd = GradientDrawable(
-                        GradientDrawable.Orientation.TL_BR,
-                        intArrayOf(color, vibe, color)
-                    )
-                    binding.bgVibe.background = gd
+                    binding.bgVibe.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(color, vibe, color))
                     binding.rootLayout.setBackgroundColor(color)
                 }
-            }
-            colorAnim.start()
+            }.start()
         } else {
-            val gd = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(theme.bgColor, theme.vibeColor, theme.bgColor)
-            )
-            binding.bgVibe.background = gd
+            binding.bgVibe.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(theme.bgColor, theme.vibeColor, theme.bgColor))
             binding.rootLayout.setBackgroundColor(theme.bgColor)
         }
-
         binding.fetchBtn.setColorFilter(theme.accentColor)
         binding.artGlow.setBackgroundColor(theme.accentColor)
         binding.visualizer.setAccentColor(theme.accentColor)
         binding.seekBar.setAccentColor(theme.accentColor)
-        binding.progressBar.indeterminateTintList =
-            android.content.res.ColorStateList.valueOf(theme.accentColor)
-
-        val playBg = GradientDrawable()
-        playBg.shape = GradientDrawable.OVAL
-        playBg.setColor(Color.WHITE)
+        binding.progressBar.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
+        val playBg = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
         binding.playPauseBtn.background = playBg
-
-        listOf(binding.eqLow, binding.eqMid, binding.eqHigh).forEach { sb ->
-            sb.progressTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
-            sb.thumbTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
+        listOf(binding.eqLow, binding.eqMid, binding.eqHigh).forEach {
+            it.progressTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
+            it.thumbTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
         }
-        listOf(binding.eqLowVal, binding.eqMidVal, binding.eqHighVal).forEach {
-            it.setTextColor(theme.accentColor)
-        }
-
+        listOf(binding.eqLowVal, binding.eqMidVal, binding.eqHighVal).forEach { it.setTextColor(theme.accentColor) }
         trackAdapter.accentColor = theme.accentColor
+        libraryAdapter.accentColor = theme.accentColor
         trackAdapter.notifyDataSetChanged()
+        libraryAdapter.notifyDataSetChanged()
+        selectLibraryTab(currentLibTab)
     }
 
     private fun blendColors(c1: Int, c2: Int, ratio: Float): Int {
         val inv = 1f - ratio
-        val r = (Color.red(c1) * inv + Color.red(c2) * ratio).toInt()
-        val g = (Color.green(c1) * inv + Color.green(c2) * ratio).toInt()
-        val b = (Color.blue(c1) * inv + Color.blue(c2) * ratio).toInt()
-        return Color.rgb(r, g, b)
+        return Color.rgb(
+            (Color.red(c1)*inv + Color.red(c2)*ratio).toInt(),
+            (Color.green(c1)*inv + Color.green(c2)*ratio).toInt(),
+            (Color.blue(c1)*inv + Color.blue(c2)*ratio).toInt()
+        )
     }
 
     // ─────────────────────────────────────────────
@@ -392,31 +620,21 @@ class MainActivity : AppCompatActivity() {
         player?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 updatePlayPauseIcon(isPlaying)
-                if (isPlaying) {
-                    uiHandler.post(uiRunnable)
-                    animateAlbumArt(true)
-                    startVisualizer()
-                } else {
-                    uiHandler.removeCallbacks(uiRunnable)
-                    animateAlbumArt(false)
-                }
+                if (isPlaying) { uiHandler.post(uiRunnable); animateAlbumArt(true); startVisualizer() }
+                else { uiHandler.removeCallbacks(uiRunnable); animateAlbumArt(false) }
             }
-
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = player?.currentMediaItemIndex ?: return
                 if (idx >= 0 && idx < tracks.size) {
                     currentIndex = idx
                     setTrackInfo(tracks[idx], idx)
                     trackAdapter.setNowPlaying(idx)
+                    LibraryManager.addToHistory(this@MainActivity, tracks[idx])
                 }
             }
-
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED) {
-                    if (repeatMode == Player.REPEAT_MODE_ONE) {
-                        player?.seekTo(0)
-                        player?.play()
-                    }
+                if (state == Player.STATE_ENDED && repeatMode == Player.REPEAT_MODE_ONE) {
+                    player?.seekTo(0); player?.play()
                 }
             }
         })
@@ -427,79 +645,51 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun startVisualizer() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1001)
             return
         }
-
         val audioSessionId = PlayerService.audioSessionId
-        Log.d("VIBE", "audioSessionId = ${PlayerService.audioSessionId}")
-        if (audioSessionId == 0) {
-            uiHandler.postDelayed({ startVisualizer() }, 500)
-            return
-        }
-
+        Log.d("VIBE", "audioSessionId = $audioSessionId")
+        if (audioSessionId == 0) { uiHandler.postDelayed({ startVisualizer() }, 500); return }
         try {
             androidVisualizer?.release()
             androidVisualizer = Visualizer(audioSessionId).apply {
                 captureSize = Visualizer.getCaptureSizeRange()[1]
                 setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: Visualizer, waveform: ByteArray, sr: Int) {}
+                    override fun onWaveFormDataCapture(v: Visualizer, w: ByteArray, sr: Int) {}
                     override fun onFftDataCapture(v: Visualizer, fft: ByteArray, sr: Int) {
-                        runOnUiThread {
-                            binding.visualizer.updateFft(fft)
-                            updateGlow(fft)
-                        }
+                        runOnUiThread { binding.visualizer.updateFft(fft); updateGlow(fft) }
                     }
                 }, Visualizer.getMaxCaptureRate() / 2, false, true)
                 enabled = true
             }
             initEqualizer(audioSessionId)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            startVisualizer()
-        }
-        if (requestCode == 1002 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            scanAndLoadTracks()
-        }
+        if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) startVisualizer()
+        if (requestCode == 1002 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) scanLocalTracks()
     }
 
     private fun stopVisualizer() {
-        androidVisualizer?.enabled = false
-        androidVisualizer?.release()
-        androidVisualizer = null
-        equalizer?.release()
-        equalizer = null
+        androidVisualizer?.enabled = false; androidVisualizer?.release(); androidVisualizer = null
+        equalizer?.release(); equalizer = null
         binding.visualizer.clear()
     }
 
     private fun initEqualizer(audioSessionId: Int) {
-        try {
-            equalizer?.release()
-            equalizer = Equalizer(0, audioSessionId).apply { enabled = true }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { equalizer?.release(); equalizer = Equalizer(0, audioSessionId).apply { enabled = true } }
+        catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun updateGlow(fft: ByteArray) {
         if (fft.isEmpty()) return
         val energy = fft.take(20).sumOf { (it.toInt() and 0xFF) } / 20f / 255f
         val targetAlpha = (0.3f + energy * 0.7f).coerceIn(0f, 1f)
-        binding.artGlow.animate()
-            .alpha(targetAlpha)
-            .scaleX(1.1f + energy * 0.15f)
-            .scaleY(1.1f + energy * 0.15f)
-            .setDuration(80)
-            .start()
+        binding.artGlow.animate().alpha(targetAlpha).scaleX(1.1f + energy * 0.15f).scaleY(1.1f + energy * 0.15f).setDuration(80).start()
     }
 
     // ─────────────────────────────────────────────
@@ -512,28 +702,18 @@ class MainActivity : AppCompatActivity() {
         val track = tracks[index]
         setTrackInfo(track, index)
         trackAdapter.setNowPlaying(index)
-
         player?.let { p ->
             p.clearMediaItems()
-            tracks.forEach { t ->
-                p.addMediaItem(MediaItem.fromUri(t.uri))
-            }
-            p.seekTo(index, 0)
-            p.prepare()
-            p.play()
+            tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
+            p.seekTo(index, 0); p.prepare(); p.play()
         }
     }
 
     private fun togglePlayPause() {
         val p = player ?: return
         if (tracks.isEmpty()) return
-        if (p.isPlaying) {
-            p.pause()
-            stopVisualizer()
-        } else {
-            if (currentIndex < 0 && tracks.isNotEmpty()) loadTrack(0)
-            else p.play()
-        }
+        if (p.isPlaying) { p.pause(); stopVisualizer() }
+        else { if (currentIndex < 0 && tracks.isNotEmpty()) loadTrack(0) else p.play() }
     }
 
     private fun playNext() {
@@ -556,23 +736,17 @@ class MainActivity : AppCompatActivity() {
         }
         player?.repeatMode = repeatMode
         binding.repeatBtn.alpha = if (repeatMode == Player.REPEAT_MODE_OFF) 0.4f else 1f
-        binding.repeatBtn.setColorFilter(
-            if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
-            else Color.argb(153, 255, 255, 255)
-        )
+        binding.repeatBtn.setColorFilter(if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor else Color.argb(153,255,255,255))
     }
 
     private fun clearQueue() {
-        tracks.clear()
-        currentIndex = -1
-        player?.clearMediaItems()
-        player?.stop()
+        tracks.clear(); currentIndex = -1
+        player?.clearMediaItems(); player?.stop()
         stopVisualizer()
         trackAdapter.updateTracks(emptyList())
         binding.trackTitle.text = "Vibe Check"
         binding.trackArtist.text = "Queue cleared"
-        updatePlayPauseIcon(false)
-        animateAlbumArt(false)
+        updatePlayPauseIcon(false); animateAlbumArt(false)
     }
 
     // ─────────────────────────────────────────────
@@ -589,11 +763,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             val bitmap = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    contentResolver.loadThumbnail(
-                        uri,
-                        android.util.Size(512, 512),
-                        null
-                    )
+                    contentResolver.loadThumbnail(uri, android.util.Size(512,512), null)
                 } else {
                     android.media.MediaMetadataRetriever().use { mmr ->
                         mmr.setDataSource(this@MainActivity, uri)
@@ -601,26 +771,17 @@ class MainActivity : AppCompatActivity() {
                         android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
                     }
                 }
-            } catch (e: Exception) {
-                null
-            }
-
+            } catch (e: Exception) { null }
             withContext(Dispatchers.Main) {
                 if (bitmap != null) {
                     binding.albumArt.setImageBitmap(bitmap)
                     androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
-                        val swatch = palette?.dominantSwatch
-                            ?: palette?.vibrantSwatch
-                            ?: palette?.mutedSwatch
-                        if (swatch != null) {
-                            binding.artGlow.setBackgroundColor(swatch.rgb)
-                        }
+                        val swatch = palette?.dominantSwatch ?: palette?.vibrantSwatch ?: palette?.mutedSwatch
+                        if (swatch != null) binding.artGlow.setBackgroundColor(swatch.rgb)
                     }
                 } else {
                     binding.albumArt.setImageResource(0)
-                    binding.albumArt.background = ContextCompat.getDrawable(
-                        this@MainActivity, R.drawable.bg_album_art_default
-                    )
+                    binding.albumArt.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_album_art_default)
                     binding.artGlow.setBackgroundColor(currentTheme.accentColor)
                 }
             }
@@ -636,76 +797,35 @@ class MainActivity : AppCompatActivity() {
         val p = player ?: return
         val duration = p.duration.takeIf { it > 0 } ?: return
         val pos = p.currentPosition
-        val fraction = pos.toFloat() / duration.toFloat()
-
-        binding.seekBar.progress = fraction
+        binding.seekBar.progress = pos.toFloat() / duration.toFloat()
         binding.currentTime.text = formatTime(pos)
         binding.totalTime.text = formatTime(duration)
     }
 
     private fun animateAlbumArt(playing: Boolean) {
-        binding.albumArt.animate()
-            .scaleX(if (playing) 1.04f else 1f)
-            .scaleY(if (playing) 1.04f else 1f)
-            .setDuration(400)
-            .setInterpolator(DecelerateInterpolator())
-            .start()
-
-        if (!playing) {
-            binding.artGlow.animate().alpha(0f).setDuration(600).start()
-        }
+        binding.albumArt.animate().scaleX(if (playing) 1.04f else 1f).scaleY(if (playing) 1.04f else 1f).setDuration(400).setInterpolator(DecelerateInterpolator()).start()
+        if (!playing) binding.artGlow.animate().alpha(0f).setDuration(600).start()
     }
 
     private fun formatTime(ms: Long): String {
-        val s = ms / 1000
-        val m = s / 60
-        val sec = s % 60
-        return "$m:${sec.toString().padStart(2, '0')}"
+        val s = ms / 1000; val m = s / 60; val sec = s % 60
+        return "$m:${sec.toString().padStart(2,'0')}"
     }
 
     // ─────────────────────────────────────────────
-    // PANEL ANIMATIONS
+    // SETTINGS PANEL
     // ─────────────────────────────────────────────
-
-    private fun showPlaylist() {
-        trackAdapter.updateTracks(tracks)
-        binding.scrim.visibility = View.VISIBLE
-        binding.playlistSheet.visibility = View.VISIBLE
-        binding.scrim.animate().alpha(0.6f).setDuration(300).start()
-        binding.playlistSheet.animate()
-            .translationY(0f).setDuration(400)
-            .setInterpolator(DecelerateInterpolator(2f)).start()
-    }
-
-    private fun hidePlaylist() {
-        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
-            binding.scrim.visibility = View.GONE
-        }.start()
-        binding.playlistSheet.animate()
-            .translationY(binding.playlistSheet.height.toFloat() + 100f)
-            .setDuration(300).withEndAction {
-                binding.playlistSheet.visibility = View.GONE
-            }.start()
-    }
 
     private fun showSettings() {
         binding.scrim.visibility = View.VISIBLE
         binding.settingsPanel.visibility = View.VISIBLE
         binding.scrim.animate().alpha(0.6f).setDuration(300).start()
-        binding.settingsPanel.animate()
-            .translationX(0f).setDuration(400)
-            .setInterpolator(DecelerateInterpolator(2f)).start()
+        binding.settingsPanel.animate().translationX(0f).setDuration(400).setInterpolator(DecelerateInterpolator(2f)).start()
     }
 
     private fun hideSettings() {
-        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
-            binding.scrim.visibility = View.GONE
-        }.start()
-        binding.settingsPanel.animate()
-            .translationX(binding.settingsPanel.width.toFloat())
-            .setDuration(300).withEndAction {
-                binding.settingsPanel.visibility = View.GONE
-            }.start()
+        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction { binding.scrim.visibility = View.GONE }.start()
+        binding.settingsPanel.animate().translationX(binding.settingsPanel.width.toFloat()).setDuration(300).withEndAction { binding.settingsPanel.visibility = View.GONE }.start()
     }
 
     // ─────────────────────────────────────────────
@@ -716,10 +836,7 @@ class MainActivity : AppCompatActivity() {
         sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
         if (minutes <= 0) return
         sleepTimerHandler = Handler(Looper.getMainLooper())
-        sleepTimerRunnable = Runnable {
-            player?.pause()
-            stopVisualizer()
-        }
+        sleepTimerRunnable = Runnable { player?.pause(); stopVisualizer() }
         sleepTimerHandler?.postDelayed(sleepTimerRunnable!!, minutes * 60 * 1000L)
         setStatus("Sleep timer: ${minutes}m", StatusType.NEUTRAL)
     }
@@ -730,45 +847,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun startDownload() {
         val input = binding.urlInput.text?.toString()?.trim() ?: ""
-        if (input.isEmpty()) {
-            setStatus("no url or search term provided.", StatusType.ERROR)
-            return
-        }
+        if (input.isEmpty()) { setStatus("no url or search term provided.", StatusType.ERROR); return }
 
-        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
-            .hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
-
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
         setStatus("fetching… this may take a moment.", StatusType.NEUTRAL)
         binding.fetchBtn.isEnabled = false
         binding.progressBar.isVisible = true
 
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runDownload(input) }
-
             binding.fetchBtn.isEnabled = true
             binding.progressBar.isVisible = false
 
             if (result.startsWith("ERROR:")) {
                 setStatus(result, StatusType.ERROR)
             } else {
-                setStatus("done ✓ adding to queue…", StatusType.SUCCESS)
+                setStatus("done ✓ saving…", StatusType.SUCCESS)
                 val uri = saveToDownloads(result)
                 if (uri != null) {
                     val file = File(result)
-                    val title = file.nameWithoutExtension
-                        .replace('_', ' ').replace('-', ' ').trim()
+                    val title = file.nameWithoutExtension.replace('_',' ').replace('-',' ').trim()
                     val newTrack = Track(uri = uri, title = title)
-
-                    tracks.add(0, newTrack)
-                    currentIndex = if (currentIndex >= 0) currentIndex + 1 else -1
-                    trackAdapter.updateTracks(tracks)
-
-                    if (player?.isPlaying == false) {
-                        loadTrack(0)
-                    }
-
+                    LibraryManager.addDownload(this@MainActivity, newTrack)
                     binding.urlInput.text?.clear()
-                    setStatus("added: $title", StatusType.SUCCESS)
+                    setStatus("Saved: $title", StatusType.SUCCESS)
                 }
             }
         }
@@ -777,47 +879,32 @@ class MainActivity : AppCompatActivity() {
     private fun runDownload(url: String): String {
         return try {
             val py = Python.getInstance()
-            val module = py.getModule("main")
-            val tmpDir = cacheDir.absolutePath
-            module.callAttr("download_audio", url, tmpDir).toString()
-        } catch (e: Exception) {
-            "ERROR: ${e.message}"
-        }
+            py.getModule("main").callAttr("download_audio", url, cacheDir.absolutePath).toString()
+        } catch (e: Exception) { "ERROR: ${e.message}" }
     }
 
     private fun saveToDownloads(srcPath: String): Uri? {
         val src = File(srcPath)
         if (!src.exists()) return null
-
         val mimeType = when (src.extension.lowercase()) {
-            "mp3" -> "audio/mpeg"
-            "m4a" -> "audio/mp4"
-            "opus" -> "audio/opus"
-            "webm" -> "audio/webm"
-            else -> "audio/*"
+            "mp3" -> "audio/mpeg"; "m4a" -> "audio/mp4"; "opus" -> "audio/opus"; "webm" -> "audio/webm"; else -> "audio/*"
         }
-
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, src.name)
                 put(MediaStore.Downloads.MIME_TYPE, mimeType)
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
-            val resolver = contentResolver
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return null
-            resolver.openOutputStream(uri)?.use { out -> src.inputStream().copyTo(out) }
-            values.clear()
-            values.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(uri, values, null, null)
-            src.delete()
-            uri
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
+            contentResolver.openOutputStream(uri)?.use { src.inputStream().copyTo(it) }
+            values.clear(); values.put(MediaStore.Downloads.IS_PENDING, 0)
+            contentResolver.update(uri, values, null, null)
+            src.delete(); uri
         } else {
             val destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             destDir.mkdirs()
             val dest = File(destDir, src.name)
-            src.copyTo(dest, overwrite = true)
-            src.delete()
+            src.copyTo(dest, overwrite = true); src.delete()
             Uri.fromFile(dest)
         }
     }
@@ -828,21 +915,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkForUpdate() {
         lifecycleScope.launch {
-            val update = withContext(Dispatchers.IO) {
-                UpdateChecker.checkForUpdate(BuildConfig.VERSION_CODE)
-            }
+            val update = withContext(Dispatchers.IO) { UpdateChecker.checkForUpdate(BuildConfig.VERSION_CODE) }
             if (update != null) {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("Update available — ${update.versionName}")
                     .setMessage(update.changelog)
-                    .setPositiveButton("Update Now") { _, _ ->
-                        UpdateChecker.downloadAndInstall(this@MainActivity, update)
-                    }
-                    .setNeutralButton("View on GitHub") { _, _ ->
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
-                    }
-                    .setNegativeButton("Later", null)
-                    .show()
+                    .setPositiveButton("Update Now") { _, _ -> UpdateChecker.downloadAndInstall(this@MainActivity, update) }
+                    .setNeutralButton("View on GitHub") { _, _ -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl))) }
+                    .setNegativeButton("Later", null).show()
             }
         }
     }
@@ -855,13 +935,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun setStatus(msg: String, type: StatusType) {
         binding.statusText.text = msg
-        binding.statusText.setTextColor(
-            getColor(when (type) {
-                StatusType.ERROR -> R.color.status_error
-                StatusType.SUCCESS -> R.color.status_success
-                StatusType.NEUTRAL -> R.color.status_muted
-            })
-        )
+        binding.statusText.setTextColor(getColor(when (type) {
+            StatusType.ERROR -> R.color.status_error
+            StatusType.SUCCESS -> R.color.status_success
+            StatusType.NEUTRAL -> R.color.status_muted
+        }))
     }
 
     // ─────────────────────────────────────────────
