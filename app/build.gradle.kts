@@ -74,6 +74,7 @@ chaquopy {
 
 dependencies {
 
+    implementation "com.github.bumptech.glide:glide:4.16.0"
     // AndroidX Core
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
