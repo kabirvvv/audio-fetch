@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Down arrow -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,16L6,10H10V4H14V10H18L12,16Z" />
+
+    <!-- Tray / underline -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4,18H20V20H4V18Z" />
+
+</vector>
