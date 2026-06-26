@@ -836,5 +836,76 @@
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true" />
+    <!-- ═══════════════════════════════════════════
+         SEARCH RESULTS BOTTOM SHEET
+         ═══════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/searchSheet"
+        android:layout_width="match_parent"
+        android:layout_height="520dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_bottom_sheet"
+        android:translationY="999dp"
+        android:elevation="16dp"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Header -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/searchSheetTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Results"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05" />
+
+                <ImageButton
+                    android:id="@+id/closeSearchSheetBtn"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_close"
+                    android:tint="#80FFFFFF"
+                    android:contentDescription="Close" />
+            </LinearLayout>
+
+            <!-- Loading indicator shown while fetching -->
+            <ProgressBar
+                android:id="@+id/searchSheetProgress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_horizontal"
+                android:indeterminate="true"
+                android:indeterminateTint="#00FFA2"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Results list -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/searchResultsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp" />
+
+        </LinearLayout>
+    </FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
