@@ -64,7 +64,7 @@
                         android:contentDescription="Settings" />
                 </FrameLayout>
 
-                <!-- Search / URL input + action buttons -->
+                <!-- Search / URL input + fetch button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -96,22 +96,12 @@
                             android:singleLine="true" />
                     </FrameLayout>
 
-                    <!-- Download + Stream buttons row -->
+                    <!-- Fetch button row (stream is now default action) -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="end">
-
-                        <ImageButton
-                            android:id="@+id/streamBtn"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_marginEnd="4dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_play"
-                            android:tint="#00FFA2"
-                            android:contentDescription="Stream" />
 
                         <ImageButton
                             android:id="@+id/fetchBtn"
@@ -120,7 +110,7 @@
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:src="@drawable/ic_search"
                             android:tint="#00FFA2"
-                            android:contentDescription="Download" />
+                            android:contentDescription="Stream" />
 
                     </LinearLayout>
                 </LinearLayout>
@@ -186,40 +176,64 @@
                         android:gravity="center" />
                 </LinearLayout>
 
-                <!-- Progress area -->
+                <!-- Progress area + download button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:layout_marginBottom="8dp">
 
-                    <LinearLayout
+                    <!-- Time row with download button tucked on the right -->
+                    <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
                         android:layout_marginBottom="8dp">
 
-                        <TextView
-                            android:id="@+id/currentTime"
-                            android:layout_width="0dp"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="0:00"
-                            android:textColor="#80FFFFFF"
-                            android:textSize="11sp"
-                            android:fontFamily="monospace" />
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
 
-                        <TextView
-                            android:id="@+id/totalTime"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="0:00"
-                            android:textColor="#80FFFFFF"
-                            android:textSize="11sp"
-                            android:fontFamily="monospace"
-                            android:gravity="end" />
-                    </LinearLayout>
+                            <TextView
+                                android:id="@+id/currentTime"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="0:00"
+                                android:textColor="#80FFFFFF"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace" />
+
+                            <!-- Spacer so totalTime stays centred even with download btn -->
+                            <View
+                                android:layout_width="32dp"
+                                android:layout_height="1dp" />
+
+                            <TextView
+                                android:id="@+id/totalTime"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="0:00"
+                                android:textColor="#80FFFFFF"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:gravity="end" />
+                        </LinearLayout>
+
+                        <!-- Download button: top-right corner, hidden until streaming -->
+                        <ImageButton
+                            android:id="@+id/downloadBtn"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center_vertical|end"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:src="@drawable/ic_download"
+                            android:tint="#00FFA2"
+                            android:visibility="gone"
+                            android:contentDescription="Download current track" />
+                    </FrameLayout>
 
                     <com.audiofetch.VibeSeekBar
                         android:id="@+id/seekBar"
