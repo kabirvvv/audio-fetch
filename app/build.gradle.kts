@@ -67,6 +67,7 @@ chaquopy {
         pip {
             install("yt-dlp")
             install("mutagen")
+            install("ytmusicapi")
         }
     }
 }
