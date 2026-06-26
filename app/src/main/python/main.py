@@ -110,3 +110,35 @@ def download_audio(url: str, download_dir: str) -> str:
     except Exception as e:
         return f"ERROR: {str(e)}"
         
+def get_stream_url(url: str) -> str:
+    """Extract a direct streamable audio URL without downloading.
+    Returns the URL string, or 'ERROR: ...' on failure."""
+    try:
+        query = resolve_query(url)
+        info_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+        }
+        with yt_dlp.YoutubeDL(info_opts) as ydl:
+            info = first_entry(ydl.extract_info(query, download=False))
+
+        stream_url = info.get("url", "")
+        title = info.get("title", "Unknown")
+        artist = info.get("artist") or info.get("uploader") or info.get("channel") or ""
+        thumbnail = info.get("thumbnail", "")
+
+        if not stream_url:
+            return "ERROR: No stream URL found."
+
+        # Return JSON so Kotlin can parse title/artist/art alongside the URL
+        import json
+        return json.dumps({
+            "url": stream_url,
+            "title": title,
+            "artist": artist,
+            "thumbnail": thumbnail,
+        })
+    except Exception as e:
+        return f"ERROR: {str(e)}"
