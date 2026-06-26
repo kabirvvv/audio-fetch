@@ -7,7 +7,6 @@
     android:layout_height="match_parent"
     android:background="#020503">
 
-    <!-- Background gradient view (animates with theme) -->
     <View
         android:id="@+id/bgVibe"
         android:layout_width="match_parent"
@@ -65,41 +64,66 @@
                         android:contentDescription="Settings" />
                 </FrameLayout>
 
-                <!-- Search / URL input -->
-                <FrameLayout
+                <!-- Search / URL input + action buttons -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:layout_marginBottom="40dp">
 
-                    <EditText
-                        android:id="@+id/urlInput"
+                    <!-- Input row -->
+                    <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
-                        android:background="@drawable/bg_input"
-                        android:hint="@string/hint_search"
-                        android:textColorHint="#40FFFFFF"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:letterSpacing="0.05"
-                        android:paddingStart="24dp"
-                        android:paddingEnd="56dp"
-                        android:gravity="center_vertical"
-                        android:imeOptions="actionGo"
-                        android:inputType="textUri"
-                        android:maxLines="1"
-                        android:singleLine="true" />
+                        android:layout_marginBottom="8dp">
 
-                    <ImageButton
-                        android:id="@+id/fetchBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_gravity="center_vertical|end"
-                        android:layout_marginEnd="8dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_search"
-                        android:tint="#00FFA2"
-                        android:contentDescription="Download" />
-                </FrameLayout>
+                        <EditText
+                            android:id="@+id/urlInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_input"
+                            android:hint="@string/hint_search"
+                            android:textColorHint="#40FFFFFF"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:letterSpacing="0.05"
+                            android:paddingStart="24dp"
+                            android:paddingEnd="16dp"
+                            android:gravity="center_vertical"
+                            android:imeOptions="actionGo"
+                            android:inputType="textUri"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </FrameLayout>
+
+                    <!-- Download + Stream buttons row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="end">
+
+                        <ImageButton
+                            android:id="@+id/streamBtn"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="4dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:src="@drawable/ic_play"
+                            android:tint="#00FFA2"
+                            android:contentDescription="Stream" />
+
+                        <ImageButton
+                            android:id="@+id/fetchBtn"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:src="@drawable/ic_search"
+                            android:tint="#00FFA2"
+                            android:contentDescription="Download" />
+
+                    </LinearLayout>
+                </LinearLayout>
 
                 <!-- Album art with glow -->
                 <FrameLayout
@@ -288,7 +312,7 @@
                         android:contentDescription="Repeat" />
                 </LinearLayout>
 
-                <!-- Download status -->
+                <!-- Status -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -319,220 +343,213 @@
 
     </LinearLayout>
 
-<!-- ═══════════════════════════════════════════
-     LIBRARY CONTAINER (hidden by default)
-     ═══════════════════════════════════════════ -->
-<LinearLayout
-    android:id="@+id/libraryContainer"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#020503"
-    android:paddingBottom="56dp"
-    android:visibility="gone">
-
-    <!-- Header -->
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:text="Library"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <ImageButton
-            android:id="@+id/libraryCloseBtn"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_close"
-            android:tint="#60FFFFFF"
-            android:contentDescription="Close library" />
-    </RelativeLayout>
-
-    <!-- ── NORMAL LIBRARY VIEW (tabs + tracks + playlists) ── -->
+    <!-- ═══════════════════════════════════════════
+         LIBRARY CONTAINER (hidden by default)
+         ═══════════════════════════════════════════ -->
     <LinearLayout
-        android:id="@+id/libraryNormalSection"
+        android:id="@+id/libraryContainer"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#020503"
+        android:paddingBottom="56dp"
+        android:visibility="gone">
 
-        <!-- Library tab row -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:paddingHorizontal="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:text="Library"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/libraryCloseBtn"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_close"
+                android:tint="#60FFFFFF"
+                android:contentDescription="Close library" />
+        </RelativeLayout>
+
+        <!-- Normal library view -->
         <LinearLayout
-            android:id="@+id/libraryTabsRow"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="8dp">
-
-            <TextView
-                android:id="@+id/libTabDownloads"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="Downloads"
-                android:textSize="13sp"
-                android:textColor="#00FFA2" />
-
-            <TextView
-                android:id="@+id/libTabLocal"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="Local"
-                android:textSize="13sp"
-                android:textColor="#40FFFFFF" />
-
-            <TextView
-                android:id="@+id/libTabHistory"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="History"
-                android:textSize="13sp"
-                android:textColor="#40FFFFFF" />
-
-        </LinearLayout>
-
-        <!-- Thin tab indicator line -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#20FFFFFF"
-            android:layout_marginBottom="4dp" />
-
-        <!-- Library track list — takes remaining space above playlists -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/libraryRecycler"
+            android:id="@+id/libraryNormalSection"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingBottom="8dp"
-            android:scrollbars="none"
-            android:overScrollMode="never" />
-
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#20FFFFFF" />
-
-        <!-- Playlists section — fixed height, scrollable -->
-        <LinearLayout
-            android:id="@+id/playlistsSection"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="0.6"
             android:orientation="vertical">
 
-            <RelativeLayout
+            <LinearLayout
+                android:id="@+id/libraryTabsRow"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:paddingHorizontal="16dp">
+                android:layout_height="44dp"
+                android:orientation="horizontal"
+                android:paddingHorizontal="8dp">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_centerVertical="true"
-                    android:text="Playlists"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+                    android:id="@+id/libTabDownloads"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Downloads"
+                    android:textSize="13sp"
+                    android:textColor="#00FFA2" />
 
-                <Button
-                    android:id="@+id/newPlaylistBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:text="+ New"
-                    android:textSize="12sp"
-                    android:textColor="#00FFA2"
-                    android:backgroundTint="@android:color/transparent" />
+                <TextView
+                    android:id="@+id/libTabLocal"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Local"
+                    android:textSize="13sp"
+                    android:textColor="#40FFFFFF" />
 
-            </RelativeLayout>
+                <TextView
+                    android:id="@+id/libTabHistory"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="History"
+                    android:textSize="13sp"
+                    android:textColor="#40FFFFFF" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#20FFFFFF"
+                android:layout_marginBottom="4dp" />
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/playlistsRecycler"
+                android:id="@+id/libraryRecycler"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:nestedScrollingEnabled="true"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp"
+                android:scrollbars="none"
+                android:overScrollMode="never" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#20FFFFFF" />
+
+            <LinearLayout
+                android:id="@+id/playlistsSection"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.6"
+                android:orientation="vertical">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="Playlists"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/newPlaylistBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:text="+ New"
+                        android:textSize="12sp"
+                        android:textColor="#00FFA2"
+                        android:backgroundTint="@android:color/transparent" />
+
+                </RelativeLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/playlistsRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:nestedScrollingEnabled="true"
+                    android:scrollbars="none"
+                    android:overScrollMode="never" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Playlist detail view -->
+        <LinearLayout
+            android:id="@+id/playlistDetailSection"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="8dp"
+                android:paddingBottom="4dp">
+
+                <Button
+                    android:id="@+id/backFromPlaylistBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="← Back"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="@android:color/transparent" />
+
+                <TextView
+                    android:id="@+id/playlistDetailTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:paddingHorizontal="8dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#20FFFFFF"
+                android:layout_marginBottom="4dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/playlistDetailRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:scrollbars="none"
                 android:overScrollMode="never" />
 
         </LinearLayout>
 
     </LinearLayout>
-
-    <!-- ── PLAYLIST DETAIL VIEW (replaces normal view when playlist is open) ── -->
-    <LinearLayout
-        android:id="@+id/playlistDetailSection"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <!-- Back button + title row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="8dp"
-            android:paddingBottom="4dp">
-
-            <Button
-                android:id="@+id/backFromPlaylistBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="← Back"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="@android:color/transparent" />
-
-            <TextView
-                android:id="@+id/playlistDetailTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:paddingHorizontal="8dp"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#20FFFFFF"
-            android:layout_marginBottom="4dp" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/playlistDetailRecycler"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:scrollbars="none"
-            android:overScrollMode="never" />
-
-    </LinearLayout>
-
-</LinearLayout>
 
     <!-- ═══════════════════════════════════════════
          BOTTOM NAV
@@ -601,7 +618,7 @@
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════
-         QUEUE BOTTOM SHEET (was playlistSheet)
+         QUEUE BOTTOM SHEET
          ═══════════════════════════════════════════ -->
     <FrameLayout
         android:id="@+id/playlistSheet"
@@ -735,7 +752,6 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="16dp" />
 
-                <!-- EQ Lows -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
                         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Lows" android:textColor="#CCFFFFFF" android:textSize="12sp" />
@@ -744,7 +760,6 @@
                     <SeekBar android:id="@+id/eqLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
-                <!-- EQ Mids -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
                         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Mids" android:textColor="#CCFFFFFF" android:textSize="12sp" />
@@ -753,7 +768,6 @@
                     <SeekBar android:id="@+id/eqMid" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
-                <!-- EQ Highs -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="28dp">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
                         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Highs" android:textColor="#CCFFFFFF" android:textSize="12sp" />
@@ -798,7 +812,7 @@
         </ScrollView>
     </FrameLayout>
 
-    <!-- Scrim for panels -->
+    <!-- Scrim -->
     <View
         android:id="@+id/scrim"
         android:layout_width="match_parent"
