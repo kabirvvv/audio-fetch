@@ -6,6 +6,12 @@ import urllib.request
 
 from mutagen.mp4 import MP4, MP4Cover
 
+try:
+    from ytmusicapi import YTMusic
+    _ytmusic = YTMusic()
+except Exception:
+    _ytmusic = None
+
 
 def sanitize(name: str) -> str:
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '-', name)
@@ -45,10 +51,103 @@ def embed_cover_art(audio_path: str, thumb_path: str, title: str, artist: str) -
         pass
 
 
+def _format_duration(seconds) -> str:
+    """Convert seconds (int or None) to m:ss string."""
+    try:
+        s = int(seconds)
+        return f"{s // 60}:{s % 60:02d}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _best_thumbnail(thumbnails) -> str:
+    """Pick the highest-res thumbnail URL from a ytmusicapi thumbnail list."""
+    if not thumbnails:
+        return ""
+    # ytmusicapi returns list sorted ascending by size; take last
+    try:
+        return thumbnails[-1].get("url", "")
+    except Exception:
+        return ""
+
+
+def search_tracks(query: str, limit: int = 15) -> str:
+    """Search YouTube Music for tracks.
+    Returns JSON array of up to `limit` results, each with:
+      videoId, title, artist, duration, durationSeconds, thumbnail, webpage_url
+    Falls back to yt-dlp ytsearch if ytmusicapi is unavailable.
+    """
+    query = query.strip()
+    if not query:
+        return "ERROR: empty query"
+
+    # ── ytmusicapi path ───────────────────────────────────────────────────────
+    if _ytmusic is not None:
+        try:
+            raw = _ytmusic.search(query, filter="songs", limit=limit)
+            results = []
+            for item in raw[:limit]:
+                video_id = item.get("videoId", "")
+                if not video_id:
+                    continue
+                title = item.get("title", "Unknown")
+                # artists is a list of dicts with 'name'
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                duration_str = item.get("duration") or ""          # e.g. "3:45"
+                duration_secs = item.get("duration_seconds") or 0
+                thumbnails = item.get("thumbnails") or []
+                thumbnail = _best_thumbnail(thumbnails)
+                results.append({
+                    "videoId": video_id,
+                    "title": title,
+                    "artist": artist,
+                    "duration": duration_str,
+                    "durationSeconds": duration_secs,
+                    "thumbnail": thumbnail,
+                    "webpage_url": f"https://music.youtube.com/watch?v={video_id}",
+                })
+            if results:
+                return json.dumps(results)
+            # fall through to yt-dlp if no results
+        except Exception:
+            pass  # fall through
+
+    # ── yt-dlp fallback ───────────────────────────────────────────────────────
+    try:
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+        entries = (info or {}).get("entries") or []
+        results = []
+        for e in entries[:limit]:
+            if not e:
+                continue
+            video_id = e.get("id") or e.get("url", "")
+            duration_secs = e.get("duration") or 0
+            results.append({
+                "videoId": video_id,
+                "title": e.get("title", "Unknown"),
+                "artist": e.get("uploader") or e.get("channel") or "",
+                "duration": _format_duration(duration_secs),
+                "durationSeconds": duration_secs,
+                "thumbnail": e.get("thumbnail") or "",
+                "webpage_url": e.get("webpage_url") or f"https://www.youtube.com/watch?v={video_id}",
+            })
+        return json.dumps(results)
+    except Exception as ex:
+        return f"ERROR: {str(ex)}"
+
+
 def get_stream_url(url: str) -> str:
     """Extract a direct streamable audio URL without downloading.
-    Returns JSON with url/title/artist/thumbnail, or 'ERROR: ...' on failure.
-    Also returns webpage_url so Kotlin can pass it back for downloading."""
+    Returns JSON with url/title/artist/thumbnail/webpage_url, or 'ERROR: ...' on failure.
+    """
     try:
         query = resolve_query(url)
         info_opts = {
@@ -64,11 +163,14 @@ def get_stream_url(url: str) -> str:
         if not stream_url:
             return "ERROR: No stream URL found."
 
+        duration_secs = info.get("duration") or 0
         return json.dumps({
             "url": stream_url,
             "title": info.get("title", "Unknown"),
             "artist": info.get("artist") or info.get("uploader") or info.get("channel") or "",
             "thumbnail": info.get("thumbnail", ""),
+            "duration": _format_duration(duration_secs),
+            "durationSeconds": duration_secs,
             "webpage_url": info.get("webpage_url") or info.get("url") or query,
         })
     except Exception as e:
