@@ -63,6 +63,10 @@ class MainActivity : AppCompatActivity() {
     private var sleepTimerHandler: Handler? = null
     private var sleepTimerRunnable: Runnable? = null
 
+    // Holds metadata of the currently streaming track so download button can use it
+    private var currentStreamWebpageUrl: String? = null
+    private var currentStreamTitle: String? = null
+
     private val uiHandler = Handler(Looper.getMainLooper())
     private val uiRunnable = object : Runnable {
         override fun run() {
@@ -75,7 +79,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var libraryAdapter: LibraryAdapter
     private lateinit var playlistsAdapter: PlaylistsAdapter
 
-    // currently open playlist (null = showing library tabs)
     private var openPlaylist: Playlist? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,7 +126,7 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun setupUI() {
-        // ── Queue ──────────────────────────────────────────────────────────────
+        // ── Queue ─────────────────────────────────────────────────────────────
         trackAdapter = TrackAdapter(mutableListOf(), ::loadTrack)
         trackAdapter.onTrackMoved = { from, to -> onQueueReordered(from, to) }
         val dragCallback = DragDropCallback(trackAdapter)
@@ -135,14 +138,13 @@ class MainActivity : AppCompatActivity() {
         }
         itemTouchHelper.attachToRecyclerView(binding.playlistRecycler)
 
-        // ── Library ────────────────────────────────────────────────────────────
+        // ── Library ───────────────────────────────────────────────────────────
         libraryAdapter = LibraryAdapter(emptyList(), ::playFromLibrary, ::onLibraryTrackLongPress)
         binding.libraryRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = libraryAdapter
         }
 
-        // ── Playlist detail recycler (reuses libraryAdapter) ──────────────────
         binding.playlistDetailRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = libraryAdapter
@@ -154,7 +156,7 @@ class MainActivity : AppCompatActivity() {
             adapter = playlistsAdapter
         }
 
-        // ── Library tab buttons ───────────────────────────────────────────────
+        // ── Library tabs ──────────────────────────────────────────────────────
         binding.libTabDownloads.setOnClickListener { selectLibraryTab(0) }
         binding.libTabLocal.setOnClickListener     { selectLibraryTab(1) }
         binding.libTabHistory.setOnClickListener   { selectLibraryTab(2) }
@@ -166,11 +168,16 @@ class MainActivity : AppCompatActivity() {
         binding.navLibrary.setOnClickListener { showLibraryTab() }
 
         // ── Player controls ───────────────────────────────────────────────────
-        binding.fetchBtn.setOnClickListener { startDownload() }
-        binding.streamBtn.setOnClickListener { startStream() }
+        // fetchBtn now triggers streaming (default action)
+        binding.fetchBtn.setOnClickListener { startStream() }
         binding.urlInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_GO) { startDownload(); true } else false
+            if (actionId == EditorInfo.IME_ACTION_GO) { startStream(); true } else false
         }
+
+        // Download button — downloads whatever is currently streaming
+        binding.downloadBtn.setOnClickListener { downloadCurrentStream() }
+        binding.downloadBtn.isVisible = false // hidden until something is streaming
+
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
         binding.nextBtn.setOnClickListener { playNext() }
         binding.prevBtn.setOnClickListener { playPrev() }
@@ -186,7 +193,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.menuBtn.setOnClickListener { showSettings() }
         binding.closeSettingsBtn.setOnClickListener { hideSettings() }
-
         binding.libraryCloseBtn.setOnClickListener { showPlayerTab() }
 
         binding.scrim.setOnClickListener {
@@ -568,7 +574,7 @@ class MainActivity : AppCompatActivity() {
             binding.rootLayout.setBackgroundColor(theme.bgColor)
         }
         binding.fetchBtn.setColorFilter(theme.accentColor)
-        binding.streamBtn.setColorFilter(theme.accentColor)
+        binding.downloadBtn.setColorFilter(theme.accentColor)
         binding.artGlow.setBackgroundColor(theme.accentColor)
         binding.visualizer.setAccentColor(theme.accentColor)
         binding.seekBar.setAccentColor(theme.accentColor)
@@ -695,6 +701,10 @@ class MainActivity : AppCompatActivity() {
         val track = tracks[index]
         setTrackInfo(track)
         trackAdapter.setNowPlaying(index)
+        // Clear stream context when playing a local/downloaded track
+        currentStreamWebpageUrl = null
+        currentStreamTitle = null
+        binding.downloadBtn.isVisible = false
         player?.let { p ->
             p.clearMediaItems()
             tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
@@ -739,6 +749,9 @@ class MainActivity : AppCompatActivity() {
         trackAdapter.updateTracks(emptyList())
         binding.trackTitle.text = "Vibe Check"
         binding.trackArtist.text = "Queue cleared"
+        currentStreamWebpageUrl = null
+        currentStreamTitle = null
+        binding.downloadBtn.isVisible = false
         updatePlayPauseIcon(false); animateAlbumArt(false)
     }
 
@@ -835,47 +848,135 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
-    // DOWNLOAD
+    // STREAM (default action)
     // ─────────────────────────────────────────────
 
-    private fun startDownload() {
+    private fun startStream() {
         val input = binding.urlInput.text?.toString()?.trim() ?: ""
-        if (input.isEmpty()) { setStatus("no url or search term provided.", StatusType.ERROR); return }
+        if (input.isEmpty()) { setStatus("enter a song name or url.", StatusType.ERROR); return }
 
-        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
-        setStatus("fetching… this may take a moment.", StatusType.NEUTRAL)
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
+        setStatus("finding…", StatusType.NEUTRAL)
         binding.fetchBtn.isEnabled = false
-        binding.streamBtn.isEnabled = false
         binding.progressBar.isVisible = true
 
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runDownload(input) }
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url", input).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
             binding.fetchBtn.isEnabled = true
-            binding.streamBtn.isEnabled = true
             binding.progressBar.isVisible = false
 
-            if (result.startsWith("ERROR:")) {
+            if (result.startsWith("ERROR")) {
                 setStatus(result, StatusType.ERROR)
-            } else {
-                setStatus("done ✓ saving…", StatusType.SUCCESS)
-                val uri = saveToDownloads(result)
-                if (uri != null) {
-                    val file = File(result)
-                    val title = file.nameWithoutExtension.replace('_',' ').replace('-',' ').trim()
-                    val newTrack = Track(uri = uri, title = title)
-                    LibraryManager.addDownload(this@MainActivity, newTrack)
-                    binding.urlInput.text?.clear()
-                    setStatus("Saved: $title", StatusType.SUCCESS)
+                return@launch
+            }
+
+            try {
+                val json = JSONObject(result)
+                val streamUrl = json.getString("url")
+                val title = json.getString("title")
+                val artist = json.optString("artist", "")
+                val webpageUrl = json.optString("webpage_url", "")
+
+                // Store for download button
+                currentStreamWebpageUrl = webpageUrl.ifEmpty { streamUrl }
+                currentStreamTitle = title
+
+                val streamTrack = Track(
+                    uri = Uri.parse(streamUrl),
+                    title = title,
+                    artist = artist
+                )
+
+                if (tracks.none { it.uri == streamTrack.uri }) {
+                    tracks.add(streamTrack)
+                    trackAdapter.updateTracks(tracks)
                 }
+                currentIndex = tracks.indexOfFirst { it.uri == streamTrack.uri }
+                trackAdapter.setNowPlaying(currentIndex)
+
+                binding.trackTitle.text = title
+                binding.trackArtist.text = artist.ifEmpty { "AudioFetch" }
+                binding.albumArt.setImageResource(0)
+                binding.albumArt.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_album_art_default)
+
+                val mediaItem = MediaItem.Builder()
+                    .setUri(Uri.parse(streamUrl))
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(title)
+                            .setArtist(artist)
+                            .build()
+                    )
+                    .build()
+
+                player?.let { p ->
+                    p.clearMediaItems()
+                    tracks.forEachIndexed { i, t ->
+                        if (i == currentIndex) p.addMediaItem(mediaItem)
+                        else p.addMediaItem(MediaItem.fromUri(t.uri))
+                    }
+                    p.seekTo(currentIndex, 0)
+                    p.prepare()
+                    p.play()
+                }
+
+                binding.urlInput.text?.clear()
+                binding.downloadBtn.isVisible = true
+                setStatus("streaming: $title", StatusType.SUCCESS)
+
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
             }
         }
     }
 
-    private fun runDownload(url: String): String {
-        return try {
-            val py = Python.getInstance()
-            py.getModule("main").callAttr("download_audio", url, cacheDir.absolutePath).toString()
-        } catch (e: Exception) { "ERROR: ${e.message}" }
+    // ─────────────────────────────────────────────
+    // DOWNLOAD CURRENT STREAM
+    // ─────────────────────────────────────────────
+
+    private fun downloadCurrentStream() {
+        val url = currentStreamWebpageUrl ?: return
+        val title = currentStreamTitle ?: "track"
+
+        binding.downloadBtn.isEnabled = false
+        setStatus("downloading…", StatusType.NEUTRAL)
+        binding.progressBar.isVisible = true
+
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("download_audio", url, cacheDir.absolutePath).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.progressBar.isVisible = false
+            binding.downloadBtn.isEnabled = true
+
+            if (result.startsWith("ERROR")) {
+                setStatus(result, StatusType.ERROR)
+                return@launch
+            }
+
+            val uri = saveToDownloads(result)
+            if (uri != null) {
+                val file = File(result)
+                val savedTitle = file.nameWithoutExtension.replace('_',' ').replace('-',' ').trim()
+                val newTrack = Track(uri = uri, title = savedTitle)
+                LibraryManager.addDownload(this@MainActivity, newTrack)
+                // Hide download button — it's now saved
+                binding.downloadBtn.isVisible = false
+                currentStreamWebpageUrl = null
+                setStatus("saved: $savedTitle ✓", StatusType.SUCCESS)
+            } else {
+                setStatus("ERROR: failed to save file.", StatusType.ERROR)
+            }
+        }
     }
 
     private fun saveToDownloads(srcPath: String): Uri? {
@@ -902,90 +1003,6 @@ class MainActivity : AppCompatActivity() {
             src.copyTo(dest, overwrite = true); src.delete()
             Uri.fromFile(dest)
         }
-    }
-
-    // ─────────────────────────────────────────────
-    // STREAM
-    // ─────────────────────────────────────────────
-
-    private fun startStream() {
-        val input = binding.urlInput.text?.toString()?.trim() ?: ""
-        if (input.isEmpty()) { setStatus("no url or search term provided.", StatusType.ERROR); return }
-
-        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
-        setStatus("resolving stream…", StatusType.NEUTRAL)
-        binding.fetchBtn.isEnabled = false
-        binding.streamBtn.isEnabled = false
-        binding.progressBar.isVisible = true
-
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runGetStreamUrl(input) }
-            binding.fetchBtn.isEnabled = true
-            binding.streamBtn.isEnabled = true
-            binding.progressBar.isVisible = false
-
-            if (result.startsWith("ERROR")) {
-                setStatus(result, StatusType.ERROR)
-                return@launch
-            }
-
-            try {
-                val json = JSONObject(result)
-                val streamUrl = json.getString("url")
-                val title = json.getString("title")
-                val artist = json.optString("artist", "")
-
-                val mediaItem = MediaItem.Builder()
-                    .setUri(Uri.parse(streamUrl))
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(title)
-                            .setArtist(artist)
-                            .build()
-                    )
-                    .build()
-
-                // Add a Track entry so the queue and now-playing display work
-                val streamTrack = Track(
-                    uri = Uri.parse(streamUrl),
-                    title = title,
-                    artist = artist
-                )
-                if (tracks.none { it.uri == streamTrack.uri }) {
-                    tracks.add(streamTrack)
-                    trackAdapter.updateTracks(tracks)
-                }
-                currentIndex = tracks.indexOfFirst { it.uri == streamTrack.uri }
-                trackAdapter.setNowPlaying(currentIndex)
-                setTrackInfo(streamTrack)
-
-                player?.let { p ->
-                    p.clearMediaItems()
-                    tracks.forEach { t ->
-                        if (t.uri == streamTrack.uri) {
-                            p.addMediaItem(mediaItem)
-                        } else {
-                            p.addMediaItem(MediaItem.fromUri(t.uri))
-                        }
-                    }
-                    p.seekTo(currentIndex, 0)
-                    p.prepare()
-                    p.play()
-                }
-
-                binding.urlInput.text?.clear()
-                setStatus("Streaming: $title", StatusType.SUCCESS)
-            } catch (e: Exception) {
-                setStatus("ERROR: ${e.message}", StatusType.ERROR)
-            }
-        }
-    }
-
-    private fun runGetStreamUrl(query: String): String {
-        return try {
-            val py = Python.getInstance()
-            py.getModule("main").callAttr("get_stream_url", query).toString()
-        } catch (e: Exception) { "ERROR: ${e.message}" }
     }
 
     // ─────────────────────────────────────────────
