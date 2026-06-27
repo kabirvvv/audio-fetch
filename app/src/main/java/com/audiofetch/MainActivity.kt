@@ -802,34 +802,57 @@ class MainActivity : AppCompatActivity() {
         loadAlbumArt(track.uri)
     }
 
-    private fun loadAlbumArt(uri: Uri) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val bitmap = try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    contentResolver.loadThumbnail(uri, android.util.Size(512,512), null)
-                } else {
-                    android.media.MediaMetadataRetriever().use { mmr ->
-                        mmr.setDataSource(this@MainActivity, uri)
-                        val raw = mmr.embeddedPicture ?: return@use null
-                        android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
-                    }
+   private fun loadAlbumArt(uri: Uri) {
+    lifecycleScope.launch(Dispatchers.IO) {
+        val bitmap = tryLoadAlbumArt(uri)
+        withContext(Dispatchers.Main) {
+            if (bitmap != null) {
+                binding.albumArt.setImageBitmap(bitmap)
+                androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
+                    val swatch = palette?.dominantSwatch ?: palette?.vibrantSwatch ?: palette?.mutedSwatch
+                    if (swatch != null) binding.artGlow.setBackgroundColor(swatch.rgb)
                 }
-            } catch (e: Exception) { null }
-            withContext(Dispatchers.Main) {
-                if (bitmap != null) {
-                    binding.albumArt.setImageBitmap(bitmap)
-                    androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
-                        val swatch = palette?.dominantSwatch ?: palette?.vibrantSwatch ?: palette?.mutedSwatch
-                        if (swatch != null) binding.artGlow.setBackgroundColor(swatch.rgb)
-                    }
-                } else {
-                    binding.albumArt.setImageResource(0)
-                    binding.albumArt.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_album_art_default)
-                    binding.artGlow.setBackgroundColor(currentTheme.accentColor)
-                }
+            } else {
+                binding.albumArt.setImageResource(0)
+                binding.albumArt.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_album_art_default)
+                binding.artGlow.setBackgroundColor(currentTheme.accentColor)
             }
         }
     }
+}
+
+private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
+    // Step 1: loadThumbnail (API 29+, fast, works for MediaStore-indexed files)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        try {
+            return contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
+        } catch (_: Exception) {}
+    }
+
+    // Step 2: MediaMetadataRetriever on the URI directly (reads embedded tags)
+    try {
+        android.media.MediaMetadataRetriever().use { mmr ->
+            mmr.setDataSource(this, uri)
+            val raw = mmr.embeddedPicture
+            if (raw != null) return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
+        }
+    } catch (_: Exception) {}
+
+    // Step 3: If URI is a file:// URI, try MMR with the file path directly
+    // (some content URIs fail MMR but the underlying file path works)
+    try {
+        val path = uri.path
+        if (path != null && path.isNotEmpty()) {
+            android.media.MediaMetadataRetriever().use { mmr ->
+                mmr.setDataSource(path)
+                val raw = mmr.embeddedPicture
+                if (raw != null) return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
+            }
+        }
+    } catch (_: Exception) {}
+
+    return null
+}
 
     private fun updatePlayPauseIcon(playing: Boolean) {
         binding.playIcon.visibility = if (playing) View.GONE else View.VISIBLE
