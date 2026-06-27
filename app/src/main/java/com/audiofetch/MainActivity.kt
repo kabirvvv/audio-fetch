@@ -52,6 +52,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
+    private var autoplayEnabled = false
+    private val pendingAutoplay = mutableListOf<Track>()
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var player: MediaController? = null
     private var androidVisualizer: Visualizer? = null
@@ -64,7 +67,6 @@ class MainActivity : AppCompatActivity() {
     private var sleepTimerHandler: Handler? = null
     private var sleepTimerRunnable: Runnable? = null
 
-    // Holds metadata of the currently streaming track so download button can use it
     private var currentStreamWebpageUrl: String? = null
     private var currentStreamTitle: String? = null
 
@@ -146,7 +148,6 @@ class MainActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = libraryAdapter
         }
-
         binding.playlistDetailRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = libraryAdapter
@@ -186,7 +187,6 @@ class MainActivity : AppCompatActivity() {
             if (actionId == EditorInfo.IME_ACTION_GO) { startStream(); true } else false
         }
 
-        // Download button — downloads whatever is currently streaming
         binding.downloadBtn.setOnClickListener { downloadCurrentStream() }
         binding.downloadBtn.isVisible = false
 
@@ -201,6 +201,26 @@ class MainActivity : AppCompatActivity() {
 
         binding.playlistBtn.setOnClickListener { showQueueSheet() }
         binding.closePlaylistBtn.setOnClickListener { hideQueueSheet() }
+
+        // ── Autoplay toggle ───────────────────────────────────────────────────
+        binding.autoplayToggleBtn.setOnClickListener {
+            autoplayEnabled = !autoplayEnabled
+            binding.autoplayToggleBtn.alpha = if (autoplayEnabled) 1f else 0.4f
+            binding.autoplayToggleBtn.setColorFilter(
+                if (autoplayEnabled) currentTheme.accentColor
+                else Color.argb(153, 255, 255, 255)
+            )
+            if (autoplayEnabled) {
+                val seedId = tracks.getOrNull(currentIndex)?.videoId
+                if (seedId != null && currentIndex >= tracks.size - 2) {
+                    fetchAndAppendAutoplay(seedId)
+                }
+                setStatus("autoplay on", StatusType.SUCCESS)
+            } else {
+                setStatus("autoplay off", StatusType.NEUTRAL)
+            }
+        }
+
         binding.clearQueueBtn.setOnClickListener { clearQueue() }
 
         binding.menuBtn.setOnClickListener { showSettings() }
@@ -437,7 +457,7 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun showQueueSheet() {
-        trackAdapter.updateTracks(tracks)
+        trackAdapter.updateTracks(tracks + pendingAutoplay)
         binding.scrim.visibility = View.VISIBLE
         binding.playlistSheet.visibility = View.VISIBLE
         binding.scrim.animate().alpha(0.6f).setDuration(300).start()
@@ -613,6 +633,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.fetchBtn.setColorFilter(theme.accentColor)
         binding.downloadBtn.setColorFilter(theme.accentColor)
+        binding.autoplayToggleBtn.setColorFilter(
+            if (autoplayEnabled) theme.accentColor else Color.argb(153, 255, 255, 255)
+        )
         binding.artGlow.setBackgroundColor(theme.accentColor)
         binding.visualizer.setAccentColor(theme.accentColor)
         binding.seekBar.setAccentColor(theme.accentColor)
@@ -660,6 +683,7 @@ class MainActivity : AppCompatActivity() {
                 if (isPlaying) { uiHandler.post(uiRunnable); animateAlbumArt(true); startVisualizer() }
                 else { uiHandler.removeCallbacks(uiRunnable); animateAlbumArt(false) }
             }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = player?.currentMediaItemIndex ?: return
                 if (idx >= 0 && idx < tracks.size) {
@@ -667,8 +691,17 @@ class MainActivity : AppCompatActivity() {
                     setTrackInfo(tracks[idx])
                     trackAdapter.setNowPlaying(idx)
                     LibraryManager.addToHistory(this@MainActivity, tracks[idx])
+                    // When second-to-last resolved track starts, queue up more
+                    if (autoplayEnabled && idx >= tracks.size - 2) {
+                        if (pendingAutoplay.isNotEmpty()) {
+                            resolveNextAutoplay()
+                        } else {
+                            fetchAndAppendAutoplay(tracks[idx].videoId)
+                        }
+                    }
                 }
             }
+
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED && repeatMode == Player.REPEAT_MODE_ONE) {
                     player?.seekTo(0); player?.play()
@@ -780,7 +813,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun clearQueue() {
-        tracks.clear(); currentIndex = -1
+        tracks.clear()
+        pendingAutoplay.clear()
+        currentIndex = -1
         player?.clearMediaItems(); player?.stop()
         stopVisualizer()
         trackAdapter.updateTracks(emptyList())
@@ -802,57 +837,53 @@ class MainActivity : AppCompatActivity() {
         loadAlbumArt(track.uri)
     }
 
-   private fun loadAlbumArt(uri: Uri) {
-    lifecycleScope.launch(Dispatchers.IO) {
-        val bitmap = tryLoadAlbumArt(uri)
-        withContext(Dispatchers.Main) {
-            if (bitmap != null) {
-                binding.albumArt.setImageBitmap(bitmap)
-                androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
-                    val swatch = palette?.dominantSwatch ?: palette?.vibrantSwatch ?: palette?.mutedSwatch
-                    if (swatch != null) binding.artGlow.setBackgroundColor(swatch.rgb)
+    private fun loadAlbumArt(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val bitmap = tryLoadAlbumArt(uri)
+            withContext(Dispatchers.Main) {
+                if (bitmap != null) {
+                    binding.albumArt.setImageBitmap(bitmap)
+                    androidx.palette.graphics.Palette.from(bitmap).generate { palette ->
+                        val swatch = palette?.dominantSwatch ?: palette?.vibrantSwatch ?: palette?.mutedSwatch
+                        if (swatch != null) binding.artGlow.setBackgroundColor(swatch.rgb)
+                    }
+                } else {
+                    binding.albumArt.setImageResource(0)
+                    binding.albumArt.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_album_art_default)
+                    binding.artGlow.setBackgroundColor(currentTheme.accentColor)
                 }
-            } else {
-                binding.albumArt.setImageResource(0)
-                binding.albumArt.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_album_art_default)
-                binding.artGlow.setBackgroundColor(currentTheme.accentColor)
             }
         }
     }
-}
 
-private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
-    // Step 1: loadThumbnail (API 29+, fast, works for MediaStore-indexed files)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        try {
-            return contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
-        } catch (_: Exception) {}
-    }
-
-    // Step 2: MediaMetadataRetriever on the URI directly (reads embedded tags)
-    try {
-        android.media.MediaMetadataRetriever().use { mmr ->
-            mmr.setDataSource(this, uri)
-            val raw = mmr.embeddedPicture
-            if (raw != null) return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
+    private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
+        // Step 1: loadThumbnail (API 29+, fast, works for MediaStore-indexed files)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                return contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
+            } catch (_: Exception) {}
         }
-    } catch (_: Exception) {}
-
-    // Step 3: If URI is a file:// URI, try MMR with the file path directly
-    // (some content URIs fail MMR but the underlying file path works)
-    try {
-        val path = uri.path
-        if (path != null && path.isNotEmpty()) {
+        // Step 2: MediaMetadataRetriever on the content URI (reads embedded tags)
+        try {
             android.media.MediaMetadataRetriever().use { mmr ->
-                mmr.setDataSource(path)
+                mmr.setDataSource(this, uri)
                 val raw = mmr.embeddedPicture
                 if (raw != null) return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
             }
-        }
-    } catch (_: Exception) {}
-
-    return null
-}
+        } catch (_: Exception) {}
+        // Step 3: MMR on raw file path (catches content URIs where MMR needs the path directly)
+        try {
+            val path = uri.path
+            if (!path.isNullOrEmpty()) {
+                android.media.MediaMetadataRetriever().use { mmr ->
+                    mmr.setDataSource(path)
+                    val raw = mmr.embeddedPicture
+                    if (raw != null) return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
+                }
+            }
+        } catch (_: Exception) {}
+        return null
+    }
 
     private fun updatePlayPauseIcon(playing: Boolean) {
         binding.playIcon.visibility = if (playing) View.GONE else View.VISIBLE
@@ -908,7 +939,7 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
     }
 
     // ─────────────────────────────────────────────
-    // STREAM — main entry point
+    // STREAM
     // ─────────────────────────────────────────────
 
     private fun startStream() {
@@ -918,14 +949,9 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(binding.urlInput.windowToken, 0)
 
-        // Direct URLs bypass the picker and stream immediately
         val isUrl = input.startsWith("http://") || input.startsWith("https://")
-        if (isUrl) {
-            streamDirectUrl(input)
-            return
-        }
+        if (isUrl) { streamDirectUrl(input); return }
 
-        // Text query → show search picker
         setStatus("searching…", StatusType.NEUTRAL)
         binding.fetchBtn.isEnabled = false
         binding.progressBar.isVisible = true
@@ -947,7 +973,6 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
                 hideSearchSheet()
                 return@launch
             }
-
             try {
                 val arr = JSONArray(result)
                 val list = (0 until arr.length()).map { i ->
@@ -973,55 +998,51 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
         }
     }
 
-    // Called when a search result row is tapped
-   private fun streamFromSearchResult(result: SearchResult) {
-    // Show optimistic UI immediately using metadata we already have
-    binding.trackTitle.text  = result.title
-    binding.trackArtist.text = result.artist.ifEmpty { "AudioFetch" }
-
-    // Load thumbnail immediately from search result (we already have it)
-    if (result.thumbnail.isNotEmpty()) {
-        try {
-            com.bumptech.glide.Glide.with(this)
-                .load(result.thumbnail)
-                .placeholder(R.drawable.bg_album_art_default)
-                .error(R.drawable.bg_album_art_default)
-                .centerCrop()
-                .into(binding.albumArt)
-        } catch (_: Exception) {
-            binding.albumArt.setImageResource(0)
-            binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
-        }
-    }
-
-    setStatus("loading…", StatusType.NEUTRAL)
-    binding.fetchBtn.isEnabled = false
-    binding.progressBar.isVisible = true
-
-    lifecycleScope.launch {
-        // Use videoId directly — faster than resolving through webpage_url
-        val streamJson = withContext(Dispatchers.IO) {
+    private fun streamFromSearchResult(result: SearchResult) {
+        // Optimistic UI — show metadata immediately from search result
+        binding.trackTitle.text  = result.title
+        binding.trackArtist.text = result.artist.ifEmpty { "AudioFetch" }
+        if (result.thumbnail.isNotEmpty()) {
             try {
-                Python.getInstance().getModule("main")
-                    .callAttr("get_stream_url_by_id", result.videoId).toString()
-            } catch (e: Exception) { "ERROR: ${e.message}" }
+                com.bumptech.glide.Glide.with(this)
+                    .load(result.thumbnail)
+                    .placeholder(R.drawable.bg_album_art_default)
+                    .error(R.drawable.bg_album_art_default)
+                    .centerCrop()
+                    .into(binding.albumArt)
+                binding.albumArt.tag = result.thumbnail
+            } catch (_: Exception) {
+                binding.albumArt.setImageResource(0)
+                binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
+            }
         }
-        binding.fetchBtn.isEnabled = true
-        binding.progressBar.isVisible = false
 
-        if (streamJson.startsWith("ERROR")) {
-            setStatus(streamJson, StatusType.ERROR)
-            return@launch
-        }
-        try {
-            // Pass the thumbnail we already loaded so playStreamJson doesn't re-fetch
-            playStreamJson(JSONObject(streamJson), result.thumbnail)
-        } catch (e: Exception) {
-            setStatus("ERROR: ${e.message}", StatusType.ERROR)
+        setStatus("loading…", StatusType.NEUTRAL)
+        binding.fetchBtn.isEnabled = false
+        binding.progressBar.isVisible = true
+
+        lifecycleScope.launch {
+            val streamJson = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url_by_id", result.videoId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.fetchBtn.isEnabled = true
+            binding.progressBar.isVisible = false
+
+            if (streamJson.startsWith("ERROR")) {
+                setStatus(streamJson, StatusType.ERROR)
+                return@launch
+            }
+            try {
+                playStreamJson(JSONObject(streamJson), result.thumbnail)
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
+            }
         }
     }
-}
-    // Direct URL path — skips the picker
+
     private fun streamDirectUrl(url: String) {
         setStatus("finding…", StatusType.NEUTRAL)
         binding.fetchBtn.isEnabled = false
@@ -1037,10 +1058,7 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
             binding.fetchBtn.isEnabled = true
             binding.progressBar.isVisible = false
 
-            if (result.startsWith("ERROR")) {
-                setStatus(result, StatusType.ERROR)
-                return@launch
-            }
+            if (result.startsWith("ERROR")) { setStatus(result, StatusType.ERROR); return@launch }
             try {
                 playStreamJson(JSONObject(result), "")
                 binding.urlInput.text?.clear()
@@ -1050,7 +1068,6 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
         }
     }
 
-    // Shared: takes a get_stream_url JSON object and starts playback
     private fun playStreamJson(json: JSONObject, fallbackThumbnail: String) {
         val streamUrl  = json.getString("url")
         val title      = json.getString("title")
@@ -1061,19 +1078,35 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
         currentStreamWebpageUrl = webpageUrl
         currentStreamTitle = title
 
-        val streamTrack = Track(uri = Uri.parse(streamUrl), title = title, artist = artist)
-        if (tracks.none { it.uri == streamTrack.uri }) {
+        // Parse videoId from webpage_url for autoplay chaining
+        val parsedVideoId = Uri.parse(webpageUrl).getQueryParameter("v")
+
+        val streamTrack = Track(
+            uri = Uri.parse(streamUrl),
+            title = title,
+            artist = artist,
+            videoId = parsedVideoId
+        )
+
+        if (tracks.none { it.videoId == parsedVideoId && it.videoId != null || it.uri == streamTrack.uri }) {
             tracks.add(streamTrack)
-            trackAdapter.updateTracks(tracks)
+        } else {
+            // Replace existing entry with resolved stream URL
+            val idx = tracks.indexOfFirst { it.videoId == parsedVideoId || it.uri == streamTrack.uri }
+            if (idx >= 0) tracks[idx] = streamTrack
         }
+
+        trackAdapter.updateTracks(tracks + pendingAutoplay)
         currentIndex = tracks.indexOfFirst { it.uri == streamTrack.uri }
         trackAdapter.setNowPlaying(currentIndex)
 
         binding.trackTitle.text  = title
         binding.trackArtist.text = artist.ifEmpty { "AudioFetch" }
 
-        // Load stream thumbnail via Glide
-        if (thumbnail.isNotEmpty()) {
+        // Only reload thumbnail if different from what's already shown (optimistic pre-load)
+        val currentTag = binding.albumArt.tag as? String
+        if (thumbnail.isNotEmpty() && currentTag != thumbnail) {
+            binding.albumArt.tag = thumbnail
             try {
                 com.bumptech.glide.Glide.with(this)
                     .load(thumbnail)
@@ -1085,16 +1118,16 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
                 binding.albumArt.setImageResource(0)
                 binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
             }
-        } else {
+        } else if (thumbnail.isEmpty()) {
+            binding.albumArt.tag = null
             binding.albumArt.setImageResource(0)
             binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
         }
 
         val mediaItem = MediaItem.Builder()
             .setUri(Uri.parse(streamUrl))
-            .setMediaMetadata(
-                MediaMetadata.Builder().setTitle(title).setArtist(artist).build()
-            ).build()
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(artist).build())
+            .build()
 
         player?.let { p ->
             p.clearMediaItems()
@@ -1110,13 +1143,73 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
     }
 
     // ─────────────────────────────────────────────
+    // AUTOPLAY
+    // ─────────────────────────────────────────────
+
+    private fun fetchAndAppendAutoplay(videoId: String?) {
+        if (videoId.isNullOrEmpty()) return
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_watch_playlist", videoId, 10).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            if (result.startsWith("ERROR")) return@launch
+            try {
+                val arr = JSONArray(result)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val vid = obj.optString("videoId")
+                    if (vid.isEmpty()) continue
+                    // Skip if already resolved in queue or already pending
+                    if (tracks.any { it.videoId == vid }) continue
+                    if (pendingAutoplay.any { it.videoId == vid }) continue
+                    pendingAutoplay.add(Track(
+                        uri = Uri.parse("https://music.youtube.com/watch?v=$vid"), // placeholder
+                        title = obj.optString("title", "Unknown"),
+                        artist = obj.optString("artist", ""),
+                        durationMs = obj.optLong("durationSeconds", 0) * 1000L,
+                        videoId = vid,
+                        isAutoplay = true
+                    ))
+                }
+                // Show pending tracks in queue sheet as a preview
+                trackAdapter.updateTracks(tracks + pendingAutoplay)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun resolveNextAutoplay() {
+        val next = pendingAutoplay.firstOrNull() ?: return
+        pendingAutoplay.removeAt(0)
+        lifecycleScope.launch {
+            val streamJson = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url_by_id", next.videoId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            if (streamJson.startsWith("ERROR")) {
+                resolveNextAutoplay() // skip broken track, try next
+                return@launch
+            }
+            try {
+                val json = JSONObject(streamJson)
+                val resolvedTrack = next.copy(uri = Uri.parse(json.getString("url")))
+                tracks.add(resolvedTrack)
+                player?.addMediaItem(MediaItem.fromUri(resolvedTrack.uri))
+                trackAdapter.updateTracks(tracks + pendingAutoplay)
+            } catch (_: Exception) {}
+        }
+    }
+
+    // ─────────────────────────────────────────────
     // DOWNLOAD CURRENT STREAM
     // ─────────────────────────────────────────────
 
     private fun downloadCurrentStream() {
         val url = currentStreamWebpageUrl ?: return
-        val title = currentStreamTitle ?: "track"
-
         binding.downloadBtn.isEnabled = false
         setStatus("downloading…", StatusType.NEUTRAL)
         binding.progressBar.isVisible = true
@@ -1131,10 +1224,7 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
             binding.progressBar.isVisible = false
             binding.downloadBtn.isEnabled = true
 
-            if (result.startsWith("ERROR")) {
-                setStatus(result, StatusType.ERROR)
-                return@launch
-            }
+            if (result.startsWith("ERROR")) { setStatus(result, StatusType.ERROR); return@launch }
 
             val uri = saveToDownloads(result)
             if (uri != null) {
@@ -1204,7 +1294,7 @@ private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
     private fun setStatus(msg: String, type: StatusType) {
         binding.statusText.text = msg
         binding.statusText.setTextColor(getColor(when (type) {
-            StatusType.ERROR -> R.color.status_error
+            StatusType.ERROR   -> R.color.status_error
             StatusType.SUCCESS -> R.color.status_success
             StatusType.NEUTRAL -> R.color.status_muted
         }))
