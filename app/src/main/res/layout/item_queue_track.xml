@@ -67,4 +67,16 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <TextView
+        android:id="@+id/autoplayLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="AUTOPLAY"
+        android:textColor="#60FFFFFF"
+        android:textSize="9sp"
+        android:letterSpacing="0.1"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/queueTrackDuration"
+        app:layout_constraintTop_toTopOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>
