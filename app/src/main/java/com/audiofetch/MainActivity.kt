@@ -69,10 +69,30 @@ class MainActivity : AppCompatActivity() {
     private var currentStreamWebpageUrl: String? = null
     private var currentStreamTitle: String? = null
 
+    // ── Lyrics state ──────────────────────────────────────────────────────────
+    private var lyricsVisible = false
+    private var syncedLines: List<LrcLine> = emptyList()
+    private var currentLyricLine = -1
+    private lateinit var lyricsAdapter: LyricsAdapter
+
     private val uiHandler = Handler(Looper.getMainLooper())
     private val uiRunnable = object : Runnable {
         override fun run() {
             updateProgressUI()
+            // Synced lyrics highlight
+            if (lyricsVisible && syncedLines.isNotEmpty()) {
+                val pos = player?.currentPosition ?: 0L
+                val idx = syncedLines.indexOfLast { it.timeMs <= pos }
+                if (idx != currentLyricLine) {
+                    currentLyricLine = idx
+                    lyricsAdapter.setCurrentLine(idx)
+                    if (idx >= 0) {
+                        binding.lyricsRecycler.smoothScrollToPosition(
+                            (idx + 2).coerceAtMost(syncedLines.size - 1)
+                        )
+                    }
+                }
+            }
             uiHandler.postDelayed(this, 250)
         }
     }
@@ -186,8 +206,8 @@ class MainActivity : AppCompatActivity() {
             if (actionId == EditorInfo.IME_ACTION_GO) { startStream(); true } else false
         }
 
-        binding.downloadBtn.setOnClickListener { downloadCurrentStream() }
         binding.downloadBtn.isVisible = false
+        binding.downloadBtn.setOnClickListener { downloadCurrentStream() }
 
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
         binding.nextBtn.setOnClickListener { playNext() }
@@ -230,6 +250,20 @@ class MainActivity : AppCompatActivity() {
             hideQueueSheet()
             hideSettings()
             hideSearchSheet()
+        }
+
+        // ── Lyrics ────────────────────────────────────────────────────────────
+        lyricsAdapter = LyricsAdapter()
+        binding.lyricsRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = lyricsAdapter
+        }
+        binding.lyricsBackBtn.setOnClickListener { hideLyrics() }
+        binding.lyricsBtn.setOnClickListener { showLyrics() }
+
+        // Start lyrics sheet off-screen so it can animate up
+        binding.lyricsSheet.post {
+            binding.lyricsSheet.translationY = binding.lyricsSheet.height.toFloat()
         }
 
         setupEQ()
@@ -502,6 +536,68 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
+    // LYRICS SHEET
+    // ─────────────────────────────────────────────
+
+    private fun showLyrics() {
+        lyricsVisible = true
+        binding.lyricsSheet.visibility = View.VISIBLE
+        binding.lyricsSheet.animate()
+            .translationY(0f)
+            .setDuration(400)
+            .setInterpolator(DecelerateInterpolator(2f))
+            .start()
+
+        val track = tracks.getOrNull(currentIndex) ?: run {
+            lyricsAdapter.update(listOf("Play a track to see lyrics"))
+            return
+        }
+
+        binding.lyricsTitleText.text = track.title
+        binding.lyricsLoadingIndicator.isVisible = true
+        lyricsAdapter.update(emptyList())
+
+        lifecycleScope.launch {
+            val (lines, plain) = LyricsManager.fetch(
+                title   = track.title,
+                artist  = track.artist,
+                videoId = track.videoId ?: ""
+            )
+            binding.lyricsLoadingIndicator.isVisible = false
+            if (lines.isNotEmpty()) {
+                syncedLines = lines
+                currentLyricLine = -1
+                lyricsAdapter.update(lines.map { it.text })
+                // Scroll to current playback position immediately
+                val pos = player?.currentPosition ?: 0L
+                val idx = lines.indexOfLast { it.timeMs <= pos }
+                if (idx >= 0) {
+                    lyricsAdapter.setCurrentLine(idx)
+                    currentLyricLine = idx
+                    binding.lyricsRecycler.scrollToPosition(
+                        (idx + 2).coerceAtMost(lines.size - 1)
+                    )
+                }
+            } else {
+                syncedLines = emptyList()
+                currentLyricLine = -1
+                lyricsAdapter.update(
+                    plain?.lines()?.filter { it.isNotBlank() } ?: listOf("No lyrics found")
+                )
+            }
+        }
+    }
+
+    private fun hideLyrics() {
+        lyricsVisible = false
+        binding.lyricsSheet.animate()
+            .translationY(binding.lyricsSheet.height.toFloat())
+            .setDuration(300)
+            .withEndAction { binding.lyricsSheet.visibility = View.GONE }
+            .start()
+    }
+
+    // ─────────────────────────────────────────────
     // EQ / TIMER / THEME
     // ─────────────────────────────────────────────
 
@@ -632,6 +728,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.fetchBtn.setColorFilter(theme.accentColor)
         binding.downloadBtn.setColorFilter(theme.accentColor)
+        binding.lyricsBtn.setColorFilter(theme.accentColor)
         binding.autoplayToggleBtn.setColorFilter(
             if (autoplayEnabled) theme.accentColor else Color.argb(153, 255, 255, 255)
         )
@@ -690,6 +787,10 @@ class MainActivity : AppCompatActivity() {
                     setTrackInfo(tracks[idx])
                     trackAdapter.setNowPlaying(idx)
                     LibraryManager.addToHistory(this@MainActivity, tracks[idx])
+                    // Auto-dismiss lyrics and reset sync state on track change
+                    if (lyricsVisible) hideLyrics()
+                    syncedLines = emptyList()
+                    currentLyricLine = -1
                     // Fetch more autoplay tracks when approaching the end of the queue
                     if (autoplayEnabled && idx >= tracks.size - 2) {
                         fetchAndAppendAutoplay(tracks[idx].videoId)
@@ -820,35 +921,39 @@ class MainActivity : AppCompatActivity() {
         currentStreamTitle = null
         binding.downloadBtn.isVisible = false
         updatePlayPauseIcon(false); animateAlbumArt(false)
+        // Reset lyrics state on queue clear
+        if (lyricsVisible) hideLyrics()
+        syncedLines = emptyList()
+        currentLyricLine = -1
     }
 
     // ─────────────────────────────────────────────
     // UI UPDATES
     // ─────────────────────────────────────────────
 
-   private fun setTrackInfo(track: Track) {
-    binding.trackTitle.text = track.title
-    binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
-    if (track.thumbnailUrl.isNotEmpty()) {
-        val currentTag = binding.albumArt.tag as? String
-        if (currentTag != track.thumbnailUrl) {
-            binding.albumArt.tag = track.thumbnailUrl
-            try {
-                com.bumptech.glide.Glide.with(this)
-                    .load(track.thumbnailUrl)
-                    .placeholder(R.drawable.bg_album_art_default)
-                    .error(R.drawable.bg_album_art_default)
-                    .centerCrop()
-                    .into(binding.albumArt)
-            } catch (_: Exception) {
-                binding.albumArt.setImageResource(0)
-                binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
+    private fun setTrackInfo(track: Track) {
+        binding.trackTitle.text = track.title
+        binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
+        if (track.thumbnailUrl.isNotEmpty()) {
+            val currentTag = binding.albumArt.tag as? String
+            if (currentTag != track.thumbnailUrl) {
+                binding.albumArt.tag = track.thumbnailUrl
+                try {
+                    com.bumptech.glide.Glide.with(this)
+                        .load(track.thumbnailUrl)
+                        .placeholder(R.drawable.bg_album_art_default)
+                        .error(R.drawable.bg_album_art_default)
+                        .centerCrop()
+                        .into(binding.albumArt)
+                } catch (_: Exception) {
+                    binding.albumArt.setImageResource(0)
+                    binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
+                }
             }
+        } else {
+            loadAlbumArt(track.uri)
         }
-    } else {
-        loadAlbumArt(track.uri) // fallback for local/downloaded tracks with embedded art
     }
-}
 
     private fun loadAlbumArt(uri: Uri) {
         lifecycleScope.launch(Dispatchers.IO) {
@@ -1176,10 +1281,8 @@ class MainActivity : AppCompatActivity() {
                     val obj = arr.getJSONObject(i)
                     val vid = obj.optString("videoId")
                     if (vid.isEmpty()) continue
-                    // Skip if already in queue
                     if (tracks.any { it.videoId == vid }) continue
 
-                    // Resolve stream URL immediately — no placeholder
                     val streamJson = withContext(Dispatchers.IO) {
                         try {
                             Python.getInstance().getModule("main")
@@ -1190,13 +1293,13 @@ class MainActivity : AppCompatActivity() {
 
                     val json = JSONObject(streamJson)
                     val track = Track(
-                        uri       = Uri.parse(json.getString("url")),
-                        title     = json.optString("title", obj.optString("title", "Unknown")),
-                        artist    = json.optString("artist", obj.optString("artist", "")),
+                        uri        = Uri.parse(json.getString("url")),
+                        title      = json.optString("title", obj.optString("title", "Unknown")),
+                        artist     = json.optString("artist", obj.optString("artist", "")),
                         durationMs = json.optLong("durationSeconds", 0) * 1000L,
-                        videoId   = vid,
+                        videoId    = vid,
                         isAutoplay = true,
-                        thumbnailUrl= json.optString("thumbnail","")
+                        thumbnailUrl = json.optString("thumbnail", "")
                     )
                     tracks.add(track)
                     player?.addMediaItem(MediaItem.fromUri(track.uri))
