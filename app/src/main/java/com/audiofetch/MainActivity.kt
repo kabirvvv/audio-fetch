@@ -766,21 +766,60 @@ class MainActivity : AppCompatActivity() {
     // PLAYBACK CONTROLS
     // ─────────────────────────────────────────────
 
-    private fun loadTrack(index: Int) {
-        if (index < 0 || index >= tracks.size) return
-        currentIndex = index
-        val track = tracks[index]
-        setTrackInfo(track)
-        trackAdapter.setNowPlaying(index)
-        currentStreamWebpageUrl = null
-        currentStreamTitle = null
-        binding.downloadBtn.isVisible = false
-        player?.let { p ->
-            p.clearMediaItems()
-            tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
-            p.seekTo(index, 0); p.prepare(); p.play()
+  private fun loadTrack(index: Int) {
+    if (index < 0 || index >= tracks.size) return
+    val track = tracks[index]
+
+    // If this is an unresolved autoplay placeholder, resolve it first
+    if (track.isAutoplay && track.uri.toString().startsWith("https://music.youtube.com/watch?v=")) {
+        setStatus("loading…", StatusType.NEUTRAL)
+        binding.progressBar.isVisible = true
+        lifecycleScope.launch {
+            val streamJson = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url_by_id", track.videoId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.progressBar.isVisible = false
+            if (streamJson.startsWith("ERROR")) {
+                setStatus(streamJson, StatusType.ERROR)
+                return@launch
+            }
+            try {
+                val json = JSONObject(streamJson)
+                val resolved = track.copy(uri = Uri.parse(json.getString("url")))
+                tracks[index] = resolved
+                // Also remove from pendingAutoplay if it's still there
+                pendingAutoplay.removeAll { it.videoId == track.videoId }
+                trackAdapter.updateTracks(tracks + pendingAutoplay)
+                doLoadTrack(index)
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
+            }
         }
+        return
     }
+
+    doLoadTrack(index)
+}
+
+private fun doLoadTrack(index: Int) {
+    if (index < 0 || index >= tracks.size) return
+    currentIndex = index
+    val track = tracks[index]
+    setTrackInfo(track)
+    trackAdapter.setNowPlaying(index)
+    currentStreamWebpageUrl = track.videoId?.let { "https://music.youtube.com/watch?v=$it" }
+    currentStreamTitle = track.title
+    binding.downloadBtn.isVisible = track.videoId != null
+
+    player?.let { p ->
+        p.clearMediaItems()
+        tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
+        p.seekTo(index, 0); p.prepare(); p.play()
+    }
+}
 
     private fun togglePlayPause() {
         val p = player ?: return
