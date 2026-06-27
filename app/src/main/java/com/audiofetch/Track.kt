@@ -9,5 +9,5 @@ data class Track(
     val durationMs: Long = 0L,
     val videoId: String? = null,
     val isAutoplay: Boolean = false,
-    val thumbnailUrl: string = ""
+    val thumbnailUrl: String = ""
 )
