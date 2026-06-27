@@ -28,6 +28,8 @@ class TrackAdapter(
         val duration:   TextView  = v.findViewById(R.id.queueTrackDuration)
         val nowPlaying: View      = v.findViewById(R.id.queueNowPlayingBar)
         val dragHandle: ImageView = v.findViewById(R.id.queueDragHandle)
+        val autoplayLabel: TextView =
+    v.findViewById(R.id.autoplayLabel)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -41,6 +43,11 @@ class TrackAdapter(
         h.title.text    = track.title
         h.artist.text   = track.artist.ifEmpty { "Unknown" }
         h.duration.text = formatMs(track.durationMs)
+        if (track.isAutoplay) {
+    h.autoplayLabel.visibility = View.VISIBLE
+} else {
+    h.autoplayLabel.visibility = View.GONE
+}
 
         val isNowPlaying = pos == nowPlayingIndex
         h.nowPlaying.visibility = if (isNowPlaying) View.VISIBLE else View.INVISIBLE
