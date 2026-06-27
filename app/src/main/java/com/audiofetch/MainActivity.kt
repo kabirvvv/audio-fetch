@@ -826,11 +826,29 @@ class MainActivity : AppCompatActivity() {
     // UI UPDATES
     // ─────────────────────────────────────────────
 
-    private fun setTrackInfo(track: Track) {
-        binding.trackTitle.text = track.title
-        binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
-        loadAlbumArt(track.uri)
+   private fun setTrackInfo(track: Track) {
+    binding.trackTitle.text = track.title
+    binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
+    if (track.thumbnailUrl.isNotEmpty()) {
+        val currentTag = binding.albumArt.tag as? String
+        if (currentTag != track.thumbnailUrl) {
+            binding.albumArt.tag = track.thumbnailUrl
+            try {
+                com.bumptech.glide.Glide.with(this)
+                    .load(track.thumbnailUrl)
+                    .placeholder(R.drawable.bg_album_art_default)
+                    .error(R.drawable.bg_album_art_default)
+                    .centerCrop()
+                    .into(binding.albumArt)
+            } catch (_: Exception) {
+                binding.albumArt.setImageResource(0)
+                binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
+            }
+        }
+    } else {
+        loadAlbumArt(track.uri) // fallback for local/downloaded tracks with embedded art
     }
+}
 
     private fun loadAlbumArt(uri: Uri) {
         lifecycleScope.launch(Dispatchers.IO) {
@@ -1075,7 +1093,8 @@ class MainActivity : AppCompatActivity() {
             uri = Uri.parse(streamUrl),
             title = title,
             artist = artist,
-            videoId = parsedVideoId
+            videoId = parsedVideoId,
+            thumbnailUrl = thumbnail
         )
 
         val existingIdx = tracks.indexOfFirst {
@@ -1176,7 +1195,8 @@ class MainActivity : AppCompatActivity() {
                         artist    = json.optString("artist", obj.optString("artist", "")),
                         durationMs = json.optLong("durationSeconds", 0) * 1000L,
                         videoId   = vid,
-                        isAutoplay = true
+                        isAutoplay = true,
+                        thumbnailUrl= json.optstring("thumbnail","")
                     )
                     tracks.add(track)
                     player?.addMediaItem(MediaItem.fromUri(track.uri))
