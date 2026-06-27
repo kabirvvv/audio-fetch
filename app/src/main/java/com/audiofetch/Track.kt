@@ -7,4 +7,6 @@ data class Track(
     val title: String,
     val artist: String = "",
     val durationMs: Long = 0L
+    val videoId: String? = null,
+    val isAutoplay: Boolean = false
 )
