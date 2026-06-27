@@ -951,33 +951,53 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Called when a search result row is tapped
-    private fun streamFromSearchResult(result: SearchResult) {
-        setStatus("loading…", StatusType.NEUTRAL)
-        binding.fetchBtn.isEnabled = false
-        binding.progressBar.isVisible = true
+   private fun streamFromSearchResult(result: SearchResult) {
+    // Show optimistic UI immediately using metadata we already have
+    binding.trackTitle.text  = result.title
+    binding.trackArtist.text = result.artist.ifEmpty { "AudioFetch" }
 
-        lifecycleScope.launch {
-            val streamJson = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_stream_url", result.webpageUrl).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            binding.fetchBtn.isEnabled = true
-            binding.progressBar.isVisible = false
-
-            if (streamJson.startsWith("ERROR")) {
-                setStatus(streamJson, StatusType.ERROR)
-                return@launch
-            }
-            try {
-                playStreamJson(JSONObject(streamJson), result.thumbnail)
-            } catch (e: Exception) {
-                setStatus("ERROR: ${e.message}", StatusType.ERROR)
-            }
+    // Load thumbnail immediately from search result (we already have it)
+    if (result.thumbnail.isNotEmpty()) {
+        try {
+            com.bumptech.glide.Glide.with(this)
+                .load(result.thumbnail)
+                .placeholder(R.drawable.bg_album_art_default)
+                .error(R.drawable.bg_album_art_default)
+                .centerCrop()
+                .into(binding.albumArt)
+        } catch (_: Exception) {
+            binding.albumArt.setImageResource(0)
+            binding.albumArt.background = ContextCompat.getDrawable(this, R.drawable.bg_album_art_default)
         }
     }
 
+    setStatus("loading…", StatusType.NEUTRAL)
+    binding.fetchBtn.isEnabled = false
+    binding.progressBar.isVisible = true
+
+    lifecycleScope.launch {
+        // Use videoId directly — faster than resolving through webpage_url
+        val streamJson = withContext(Dispatchers.IO) {
+            try {
+                Python.getInstance().getModule("main")
+                    .callAttr("get_stream_url_by_id", result.videoId).toString()
+            } catch (e: Exception) { "ERROR: ${e.message}" }
+        }
+        binding.fetchBtn.isEnabled = true
+        binding.progressBar.isVisible = false
+
+        if (streamJson.startsWith("ERROR")) {
+            setStatus(streamJson, StatusType.ERROR)
+            return@launch
+        }
+        try {
+            // Pass the thumbnail we already loaded so playStreamJson doesn't re-fetch
+            playStreamJson(JSONObject(streamJson), result.thumbnail)
+        } catch (e: Exception) {
+            setStatus("ERROR: ${e.message}", StatusType.ERROR)
+        }
+    }
+}
     // Direct URL path — skips the picker
     private fun streamDirectUrl(url: String) {
         setStatus("finding…", StatusType.NEUTRAL)
