@@ -1219,29 +1219,33 @@ private fun doLoadTrack(index: Int) {
         }
     }
 
-    private fun resolveNextAutoplay() {
-        val next = pendingAutoplay.firstOrNull() ?: return
-        pendingAutoplay.removeAt(0)
-        lifecycleScope.launch {
-            val streamJson = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_stream_url_by_id", next.videoId).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            if (streamJson.startsWith("ERROR")) {
-                resolveNextAutoplay() // skip broken track, try next
-                return@launch
-            }
+   private fun resolveNextAutoplay() {
+    val next = pendingAutoplay.firstOrNull() ?: return
+    pendingAutoplay.removeAt(0)
+    lifecycleScope.launch {
+        val streamJson = withContext(Dispatchers.IO) {
             try {
-                val json = JSONObject(streamJson)
-                val resolvedTrack = next.copy(uri = Uri.parse(json.getString("url")))
-                tracks.add(resolvedTrack)
-                player?.addMediaItem(MediaItem.fromUri(resolvedTrack.uri))
-                trackAdapter.updateTracks(tracks + pendingAutoplay)
-            } catch (_: Exception) {}
+                Python.getInstance().getModule("main")
+                    .callAttr("get_stream_url_by_id", next.videoId).toString()
+            } catch (e: Exception) { "ERROR: ${e.message}" }
         }
+        if (streamJson.startsWith("ERROR")) {
+            resolveNextAutoplay()
+            return@launch
+        }
+        try {
+            val json = JSONObject(streamJson)
+            val resolvedTrack = next.copy(
+                uri = Uri.parse(json.getString("url")),
+                title = json.optString("title", next.title),
+                artist = json.optString("artist", next.artist)
+            )
+            tracks.add(resolvedTrack)
+            player?.addMediaItem(MediaItem.fromUri(resolvedTrack.uri))
+            trackAdapter.updateTracks(tracks + pendingAutoplay)
+        } catch (_: Exception) {}
     }
+}
 
     // ─────────────────────────────────────────────
     // DOWNLOAD CURRENT STREAM
