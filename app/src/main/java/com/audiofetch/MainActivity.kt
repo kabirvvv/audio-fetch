@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     private var autoplayEnabled = false
-    private val pendingAutoplay = mutableListOf<Track>()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var player: MediaController? = null
@@ -457,7 +456,7 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun showQueueSheet() {
-        trackAdapter.updateTracks(tracks + pendingAutoplay)
+        trackAdapter.updateTracks(tracks)
         binding.scrim.visibility = View.VISIBLE
         binding.playlistSheet.visibility = View.VISIBLE
         binding.scrim.animate().alpha(0.6f).setDuration(300).start()
@@ -691,13 +690,9 @@ class MainActivity : AppCompatActivity() {
                     setTrackInfo(tracks[idx])
                     trackAdapter.setNowPlaying(idx)
                     LibraryManager.addToHistory(this@MainActivity, tracks[idx])
-                    // When second-to-last resolved track starts, queue up more
+                    // Fetch more autoplay tracks when approaching the end of the queue
                     if (autoplayEnabled && idx >= tracks.size - 2) {
-                        if (pendingAutoplay.isNotEmpty()) {
-                            resolveNextAutoplay()
-                        } else {
-                            fetchAndAppendAutoplay(tracks[idx].videoId)
-                        }
+                        fetchAndAppendAutoplay(tracks[idx].videoId)
                     }
                 }
             }
@@ -766,60 +761,22 @@ class MainActivity : AppCompatActivity() {
     // PLAYBACK CONTROLS
     // ─────────────────────────────────────────────
 
-  private fun loadTrack(index: Int) {
-    if (index < 0 || index >= tracks.size) return
-    val track = tracks[index]
+    private fun loadTrack(index: Int) {
+        if (index < 0 || index >= tracks.size) return
+        currentIndex = index
+        val track = tracks[index]
+        setTrackInfo(track)
+        trackAdapter.setNowPlaying(index)
+        currentStreamWebpageUrl = track.videoId?.let { "https://music.youtube.com/watch?v=$it" }
+        currentStreamTitle = track.title
+        binding.downloadBtn.isVisible = track.videoId != null
 
-    // If this is an unresolved autoplay placeholder, resolve it first
-    if (track.isAutoplay && track.uri.toString().startsWith("https://music.youtube.com/watch?v=")) {
-        setStatus("loading…", StatusType.NEUTRAL)
-        binding.progressBar.isVisible = true
-        lifecycleScope.launch {
-            val streamJson = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_stream_url_by_id", track.videoId).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            binding.progressBar.isVisible = false
-            if (streamJson.startsWith("ERROR")) {
-                setStatus(streamJson, StatusType.ERROR)
-                return@launch
-            }
-            try {
-                val json = JSONObject(streamJson)
-                val resolved = track.copy(uri = Uri.parse(json.getString("url")))
-                tracks[index] = resolved
-                // Also remove from pendingAutoplay if it's still there
-                pendingAutoplay.removeAll { it.videoId == track.videoId }
-                trackAdapter.updateTracks(tracks + pendingAutoplay)
-                doLoadTrack(index)
-            } catch (e: Exception) {
-                setStatus("ERROR: ${e.message}", StatusType.ERROR)
-            }
+        player?.let { p ->
+            p.clearMediaItems()
+            tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
+            p.seekTo(index, 0); p.prepare(); p.play()
         }
-        return
     }
-
-    doLoadTrack(index)
-}
-
-private fun doLoadTrack(index: Int) {
-    if (index < 0 || index >= tracks.size) return
-    currentIndex = index
-    val track = tracks[index]
-    setTrackInfo(track)
-    trackAdapter.setNowPlaying(index)
-    currentStreamWebpageUrl = track.videoId?.let { "https://music.youtube.com/watch?v=$it" }
-    currentStreamTitle = track.title
-    binding.downloadBtn.isVisible = track.videoId != null
-
-    player?.let { p ->
-        p.clearMediaItems()
-        tracks.forEach { t -> p.addMediaItem(MediaItem.fromUri(t.uri)) }
-        p.seekTo(index, 0); p.prepare(); p.play()
-    }
-}
 
     private fun togglePlayPause() {
         val p = player ?: return
@@ -853,7 +810,6 @@ private fun doLoadTrack(index: Int) {
 
     private fun clearQueue() {
         tracks.clear()
-        pendingAutoplay.clear()
         currentIndex = -1
         player?.clearMediaItems(); player?.stop()
         stopVisualizer()
@@ -896,13 +852,11 @@ private fun doLoadTrack(index: Int) {
     }
 
     private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
-        // Step 1: loadThumbnail (API 29+, fast, works for MediaStore-indexed files)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 return contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
             } catch (_: Exception) {}
         }
-        // Step 2: MediaMetadataRetriever on the content URI (reads embedded tags)
         try {
             android.media.MediaMetadataRetriever().use { mmr ->
                 mmr.setDataSource(this, uri)
@@ -910,7 +864,6 @@ private fun doLoadTrack(index: Int) {
                 if (raw != null) return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size)
             }
         } catch (_: Exception) {}
-        // Step 3: MMR on raw file path (catches content URIs where MMR needs the path directly)
         try {
             val path = uri.path
             if (!path.isNullOrEmpty()) {
@@ -1038,7 +991,6 @@ private fun doLoadTrack(index: Int) {
     }
 
     private fun streamFromSearchResult(result: SearchResult) {
-        // Optimistic UI — show metadata immediately from search result
         binding.trackTitle.text  = result.title
         binding.trackArtist.text = result.artist.ifEmpty { "AudioFetch" }
         if (result.thumbnail.isNotEmpty()) {
@@ -1117,7 +1069,6 @@ private fun doLoadTrack(index: Int) {
         currentStreamWebpageUrl = webpageUrl
         currentStreamTitle = title
 
-        // Parse videoId from webpage_url for autoplay chaining
         val parsedVideoId = Uri.parse(webpageUrl).getQueryParameter("v")
 
         val streamTrack = Track(
@@ -1127,22 +1078,22 @@ private fun doLoadTrack(index: Int) {
             videoId = parsedVideoId
         )
 
-        if (tracks.none { it.videoId == parsedVideoId && it.videoId != null || it.uri == streamTrack.uri }) {
-            tracks.add(streamTrack)
+        val existingIdx = tracks.indexOfFirst {
+            (it.videoId != null && it.videoId == parsedVideoId) || it.uri == streamTrack.uri
+        }
+        if (existingIdx >= 0) {
+            tracks[existingIdx] = streamTrack
         } else {
-            // Replace existing entry with resolved stream URL
-            val idx = tracks.indexOfFirst { it.videoId == parsedVideoId || it.uri == streamTrack.uri }
-            if (idx >= 0) tracks[idx] = streamTrack
+            tracks.add(streamTrack)
         }
 
-        trackAdapter.updateTracks(tracks + pendingAutoplay)
         currentIndex = tracks.indexOfFirst { it.uri == streamTrack.uri }
+        trackAdapter.updateTracks(tracks)
         trackAdapter.setNowPlaying(currentIndex)
 
         binding.trackTitle.text  = title
         binding.trackArtist.text = artist.ifEmpty { "AudioFetch" }
 
-        // Only reload thumbnail if different from what's already shown (optimistic pre-load)
         val currentTag = binding.albumArt.tag as? String
         if (thumbnail.isNotEmpty() && currentTag != thumbnail) {
             binding.albumArt.tag = thumbnail
@@ -1179,6 +1130,11 @@ private fun doLoadTrack(index: Int) {
 
         binding.downloadBtn.isVisible = true
         setStatus("streaming: $title", StatusType.SUCCESS)
+
+        // Kick off autoplay fetch in background if enabled
+        if (autoplayEnabled && parsedVideoId != null) {
+            fetchAndAppendAutoplay(parsedVideoId)
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -1201,51 +1157,34 @@ private fun doLoadTrack(index: Int) {
                     val obj = arr.getJSONObject(i)
                     val vid = obj.optString("videoId")
                     if (vid.isEmpty()) continue
-                    // Skip if already resolved in queue or already pending
+                    // Skip if already in queue
                     if (tracks.any { it.videoId == vid }) continue
-                    if (pendingAutoplay.any { it.videoId == vid }) continue
-                    pendingAutoplay.add(Track(
-                        uri = Uri.parse("https://music.youtube.com/watch?v=$vid"), // placeholder
-                        title = obj.optString("title", "Unknown"),
-                        artist = obj.optString("artist", ""),
-                        durationMs = obj.optLong("durationSeconds", 0) * 1000L,
-                        videoId = vid,
+
+                    // Resolve stream URL immediately — no placeholder
+                    val streamJson = withContext(Dispatchers.IO) {
+                        try {
+                            Python.getInstance().getModule("main")
+                                .callAttr("get_stream_url_by_id", vid).toString()
+                        } catch (e: Exception) { "ERROR: ${e.message}" }
+                    }
+                    if (streamJson.startsWith("ERROR")) continue
+
+                    val json = JSONObject(streamJson)
+                    val track = Track(
+                        uri       = Uri.parse(json.getString("url")),
+                        title     = json.optString("title", obj.optString("title", "Unknown")),
+                        artist    = json.optString("artist", obj.optString("artist", "")),
+                        durationMs = json.optLong("durationSeconds", 0) * 1000L,
+                        videoId   = vid,
                         isAutoplay = true
-                    ))
+                    )
+                    tracks.add(track)
+                    player?.addMediaItem(MediaItem.fromUri(track.uri))
+                    trackAdapter.updateTracks(tracks)
                 }
-                // Show pending tracks in queue sheet as a preview
-                trackAdapter.updateTracks(tracks + pendingAutoplay)
             } catch (_: Exception) {}
         }
     }
-
-   private fun resolveNextAutoplay() {
-    val next = pendingAutoplay.firstOrNull() ?: return
-    pendingAutoplay.removeAt(0)
-    lifecycleScope.launch {
-        val streamJson = withContext(Dispatchers.IO) {
-            try {
-                Python.getInstance().getModule("main")
-                    .callAttr("get_stream_url_by_id", next.videoId).toString()
-            } catch (e: Exception) { "ERROR: ${e.message}" }
-        }
-        if (streamJson.startsWith("ERROR")) {
-            resolveNextAutoplay()
-            return@launch
-        }
-        try {
-            val json = JSONObject(streamJson)
-            val resolvedTrack = next.copy(
-                uri = Uri.parse(json.getString("url")),
-                title = json.optString("title", next.title),
-                artist = json.optString("artist", next.artist)
-            )
-            tracks.add(resolvedTrack)
-            player?.addMediaItem(MediaItem.fromUri(resolvedTrack.uri))
-            trackAdapter.updateTracks(tracks + pendingAutoplay)
-        } catch (_: Exception) {}
-    }
-}
 
     // ─────────────────────────────────────────────
     // DOWNLOAD CURRENT STREAM
