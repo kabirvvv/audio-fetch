@@ -1196,7 +1196,7 @@ class MainActivity : AppCompatActivity() {
                         durationMs = json.optLong("durationSeconds", 0) * 1000L,
                         videoId   = vid,
                         isAutoplay = true,
-                        thumbnailUrl= json.optstring("thumbnail","")
+                        thumbnailUrl= json.optString("thumbnail","")
                     )
                     tracks.add(track)
                     player?.addMediaItem(MediaItem.fromUri(track.uri))
