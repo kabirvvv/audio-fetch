@@ -926,7 +926,7 @@
         </LinearLayout>
     </FrameLayout>
     <include layout="@layout/lyrics_sheet" 
-        android:layout_width="match-parent"
-        android:layout_height="match_present" />
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
