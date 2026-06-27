@@ -925,5 +925,6 @@
 
         </LinearLayout>
     </FrameLayout>
+    <include layout="@layout/lyrics_sheet" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
