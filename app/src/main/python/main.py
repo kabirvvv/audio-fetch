@@ -260,3 +260,36 @@ def download_audio(url: str, download_dir: str) -> str:
         return final_path
     except Exception as e:
         return f"ERROR: {str(e)}"
+def get_watch_playlist(video_id: str, limit: int = 10) -> str:
+    """Fetch autoplay candidates for a given videoId using ytmusicapi.
+    Returns JSON array of up to `limit` tracks with:
+      videoId, title, artist, durationSeconds, thumbnail
+    Returns 'ERROR: ...' if unavailable.
+    """
+    if _ytmusic is None:
+        return "ERROR: ytmusicapi unavailable"
+    try:
+        data = _ytmusic.get_watch_playlist(videoId=video_id, limit=limit + 1)
+        tracks = data.get("tracks", [])
+        results = []
+        for item in tracks:
+            vid = item.get("videoId", "")
+            if not vid or vid == video_id:  # skip seed track
+                continue
+            artists = item.get("artists") or []
+            artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+            thumbnails = item.get("thumbnail") or []
+            thumbnail = _best_thumbnail(thumbnails)
+            duration_secs = item.get("length") or 0
+            results.append({
+                "videoId": vid,
+                "title": item.get("title", "Unknown"),
+                "artist": artist,
+                "durationSeconds": duration_secs,
+                "thumbnail": thumbnail,
+            })
+            if len(results) >= limit:
+                break
+        return json.dumps(results)
+    except Exception as e:
+        return f"ERROR: {str(e)}"
