@@ -8,5 +8,6 @@ data class Track(
     val artist: String = "",
     val durationMs: Long = 0L,
     val videoId: String? = null,
-    val isAutoplay: Boolean = false
+    val isAutoplay: Boolean = false,
+    val thumbnailUrl: string = ""
 )
