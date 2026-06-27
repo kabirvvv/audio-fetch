@@ -175,7 +175,38 @@ def get_stream_url(url: str) -> str:
         })
     except Exception as e:
         return f"ERROR: {str(e)}"
+def get_stream_url_by_id(video_id: str) -> str:
+    """Resolve a stream URL directly from a YouTube video ID.
+    Faster than get_stream_url() — no search step, just direct resolution.
+    Returns same JSON schema as get_stream_url().
+    """
+    url = f"https://music.youtube.com/watch?v={video_id}"
+    try:
+        info_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+        }
+        with yt_dlp.YoutubeDL(info_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
+        stream_url = info.get("url", "")
+        if not stream_url:
+            return "ERROR: No stream URL found."
+
+        duration_secs = info.get("duration") or 0
+        return json.dumps({
+            "url": stream_url,
+            "title": info.get("title", "Unknown"),
+            "artist": info.get("artist") or info.get("uploader") or info.get("channel") or "",
+            "thumbnail": info.get("thumbnail", ""),
+            "duration": _format_duration(duration_secs),
+            "durationSeconds": duration_secs,
+            "webpage_url": url,
+        })
+    except Exception as e:
+        return f"ERROR: {str(e)}"
 
 def download_audio(url: str, download_dir: str) -> str:
     try:
