@@ -586,8 +586,10 @@ if (shelves != null) {
                 if (card.videoId.isEmpty()) return
                 streamFromHomeCard(card)
             }
-            HomeCardType.ALBUM, HomeCardType.PLAYLIST ->
-                setStatus("Coming soon: ${card.title}", StatusType.NEUTRAL)
+           HomeCardType.ALBUM, HomeCardType.PLAYLIST -> {
+    val browseId = card.playlistId ?: return
+    showPlaylistBrowseSheet(card.title, browseId)
+}
             HomeCardType.MOOD -> { }
         }
     }
