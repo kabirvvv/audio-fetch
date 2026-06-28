@@ -1675,6 +1675,30 @@ if (shelves != null) {
         }
     }
 
+    private fun streamFromHomeCard(card: HomeCard) {
+    setStatus("loading…", StatusType.NEUTRAL)
+    binding.progressBar.isVisible = true
+
+    lifecycleScope.launch {
+        val streamJson = withContext(Dispatchers.IO) {
+            try {
+                Python.getInstance().getModule("main")
+                    .callAttr("get_stream_url_by_id", card.videoId).toString()
+            } catch (e: Exception) { "ERROR: ${e.message}" }
+        }
+        binding.progressBar.isVisible = false
+
+        if (streamJson.startsWith("ERROR")) {
+            setStatus(streamJson, StatusType.ERROR)
+            return@launch
+        }
+        try {
+            playStreamJson(JSONObject(streamJson), card.thumbnail)
+        } catch (e: Exception) {
+            setStatus("ERROR: ${e.message}", StatusType.ERROR)
+        }
+    }
+}
     // ─────────────────────────────────────────────
     // AUTOPLAY
     // ─────────────────────────────────────────────
