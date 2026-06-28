@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private lateinit var recentlyPlayedAdapter: HomeCardAdapter
+    private lateinit var playlistBrowseAdapter: SearchResultsAdapter
     private lateinit var trackAdapter: TrackAdapter
     private lateinit var libraryAdapter: LibraryAdapter
     private lateinit var playlistsAdapter: PlaylistsAdapter
@@ -306,6 +307,7 @@ class MainActivity : AppCompatActivity() {
             hideQueueSheet()
             hideSettings()
             hideSearchSheet()
+            hidePlaylistBrowseSheet()
         }
 
         // ── Lyrics ────────────────────────────────────────────────────────────
@@ -325,6 +327,7 @@ class MainActivity : AppCompatActivity() {
         setupThemeGrid()
         selectLibraryTab(0)
         setupHomeAdapters()
+        setupPlaylistBrowseSheet()
         // Start on Home tab
         switchTab(Tab.HOME)
     }
@@ -589,30 +592,19 @@ if (shelves != null) {
         }
     }
 
-    private fun streamFromHomeCard(card: HomeCard) {
-        setStatus("loading…", StatusType.NEUTRAL)
-        binding.progressBar.isVisible = true
-
-        lifecycleScope.launch {
-            val streamJson = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_stream_url_by_id", card.videoId).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            binding.progressBar.isVisible = false
-
-            if (streamJson.startsWith("ERROR")) {
-                setStatus(streamJson, StatusType.ERROR)
-                return@launch
-            }
-            try {
-                playStreamJson(JSONObject(streamJson), card.thumbnail)
-            } catch (e: Exception) {
-                setStatus("ERROR: ${e.message}", StatusType.ERROR)
-            }
+  private fun onHomeCardClick(card: HomeCard) {
+    when (card.type) {
+        HomeCardType.TRACK -> {
+            if (card.videoId.isEmpty()) return
+            streamFromHomeCard(card)
         }
+        HomeCardType.ALBUM, HomeCardType.PLAYLIST -> {
+            val browseId = card.playlistId ?: return
+            showPlaylistBrowseSheet(card.title, browseId)
+        }
+        HomeCardType.MOOD -> { }
     }
+}
 
     // ─────────────────────────────────────────────
     // LIBRARY TABS
