@@ -2,6 +2,8 @@ import yt_dlp
 import os
 import re
 import json
+import time
+import threading
 import urllib.request
 
 from mutagen.mp4 import MP4, MP4Cover
@@ -12,6 +14,58 @@ try:
 except Exception:
     _ytmusic = None
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shelf cache
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
+os.makedirs(_CACHE_DIR, exist_ok=True)
+
+# TTLs in seconds per shelf key
+_SHELF_TTL = {
+    "quick_picks":   1800,   # 30 min  — based on current track
+    "trending":      3600,   # 1 hr
+    "new_releases":  7200,   # 2 hr
+    "charts":        7200,   # 2 hr
+    "moods":        86400,   # 24 hr  — changes very rarely
+}
+_DEFAULT_TTL = 3600
+
+_cache_lock = threading.Lock()
+
+
+def _cache_path(key: str) -> str:
+    return os.path.join(_CACHE_DIR, f"{key}.json")
+
+
+def _read_cache(key: str):
+    """Return cached items if still fresh, else None."""
+    path = _cache_path(key)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        ttl = _SHELF_TTL.get(key, _DEFAULT_TTL)
+        if time.time() - data.get("updated", 0) < ttl:
+            return data.get("items")
+    except Exception:
+        pass
+    return None
+
+
+def _write_cache(key: str, items) -> None:
+    path = _cache_path(key)
+    try:
+        with _cache_lock:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"updated": time.time(), "items": items}, f)
+    except Exception:
+        pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
 def sanitize(name: str) -> str:
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '-', name)
@@ -52,7 +106,6 @@ def embed_cover_art(audio_path: str, thumb_path: str, title: str, artist: str) -
 
 
 def _format_duration(seconds) -> str:
-    """Convert seconds (int or None) to m:ss string."""
     try:
         s = int(seconds)
         return f"{s // 60}:{s % 60:02d}"
@@ -61,15 +114,192 @@ def _format_duration(seconds) -> str:
 
 
 def _best_thumbnail(thumbnails) -> str:
-    """Pick the highest-res thumbnail URL from a ytmusicapi thumbnail list."""
     if not thumbnails:
         return ""
-    # ytmusicapi returns list sorted ascending by size; take last
     try:
         return thumbnails[-1].get("url", "")
     except Exception:
         return ""
 
+
+def _card(video_id: str, title: str, artist: str, thumbnail: str,
+          card_type: str = "TRACK", playlist_id: str = None) -> dict:
+    """Build a normalised HomeCard dict."""
+    c = {
+        "videoId":   video_id,
+        "title":     title,
+        "artist":    artist,
+        "thumbnail": thumbnail,
+        "type":      card_type,
+    }
+    if playlist_id:
+        c["playlistId"] = playlist_id
+    return c
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Home shelf fetchers  (each returns List[dict] or raises)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fetch_quick_picks(seed_video_id: str, limit: int = 10):
+    """Fetch watch-playlist recommendations for seed_video_id."""
+    if not seed_video_id or _ytmusic is None:
+        return []
+    raw = json.loads(get_watch_playlist(seed_video_id, limit))
+    if isinstance(raw, list):
+        return raw          # already normalised by get_watch_playlist()
+    return []
+
+
+def _fetch_trending(limit: int = 5):
+    """Pull shelves from ytmusicapi.get_home() and map to HomeCard lists."""
+    if _ytmusic is None:
+        return []
+    shelves = _ytmusic.get_home(limit=limit)
+    results = []
+    for shelf in shelves:
+        shelf_title = shelf.get("title", "")
+        items = []
+        for item in shelf.get("contents") or []:
+            # Tracks
+            vid = item.get("videoId")
+            if vid:
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+                items.append(_card(vid, item.get("title", "Unknown"), artist, thumbnail, "TRACK"))
+                continue
+            # Albums / playlists (have browseId)
+            browse_id = (item.get("browseId") or
+                         (item.get("navigationEndpoint") or {})
+                         .get("browseEndpoint", {}).get("browseId"))
+            playlist_id = item.get("playlistId")
+            if browse_id or playlist_id:
+                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+                subtitle = item.get("subtitle") or item.get("description") or ""
+                card_type = "ALBUM" if "album" in shelf_title.lower() else "PLAYLIST"
+                items.append(_card(
+                    video_id="",
+                    title=item.get("title", "Unknown"),
+                    artist=subtitle,
+                    thumbnail=thumbnail,
+                    card_type=card_type,
+                    playlist_id=playlist_id or browse_id,
+                ))
+        if items:
+            results.append({"shelfTitle": shelf_title, "items": items})
+    return results
+
+
+def _fetch_moods():
+    """Fetch mood/genre categories from ytmusicapi."""
+    if _ytmusic is None:
+        return []
+    raw = _ytmusic.get_mood_categories()
+    moods = []
+    for _section_title, chips in raw.items():
+        for chip in chips:
+            title  = chip.get("title", "")
+            params = chip.get("params", "")
+            if title and params:
+                moods.append({"title": title, "params": params})
+    return moods
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public API
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_home(seed_video_id: str = "") -> str:
+    """Return the full Home data map as JSON.
+
+    Keys returned:
+        quick_picks   – List[HomeCard]
+        shelves       – List[{shelfTitle, items: List[HomeCard]}]  (trending etc.)
+        moods         – List[{title, params}]
+
+    Each shelf is served from cache if fresh.
+    Only stale shelves trigger a network call.
+    All network calls run in parallel threads.
+
+    Args:
+        seed_video_id: videoId of the currently / last-played track.
+                       Used for quick_picks. Pass "" if nothing is playing.
+    """
+    result = {}
+    errors = {}
+    lock   = threading.Lock()
+
+    def fetch(key, fn, *args):
+        cached = _read_cache(key)
+        if cached is not None:
+            with lock:
+                result[key] = cached
+            return
+        try:
+            data = fn(*args)
+            _write_cache(key, data)
+            with lock:
+                result[key] = data
+        except Exception as e:
+            with lock:
+                errors[key] = str(e)
+                result[key] = []        # empty shelf on error — UI shows nothing
+
+    threads = [
+        threading.Thread(target=fetch, args=("quick_picks", _fetch_quick_picks, seed_video_id)),
+        threading.Thread(target=fetch, args=("shelves",     _fetch_trending, 5)),
+        threading.Thread(target=fetch, args=("moods",       _fetch_moods)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=15)      # never block the UI more than 15 s total
+
+    return json.dumps(result)
+
+
+def prefetch_quick_picks(video_id: str) -> None:
+    """Silently refresh the quick_picks cache for video_id in a background thread.
+    Called from Kotlin when a new track starts playing.
+    Returns immediately — fire and forget.
+    """
+    def _run():
+        try:
+            data = _fetch_quick_picks(video_id)
+            _write_cache("quick_picks", data)
+        except Exception:
+            pass
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def get_mood_playlists(params: str) -> str:
+    """Return tracks for a mood/genre chip.
+
+    Returns JSON array of HomeCard dicts (type=TRACK).
+    """
+    if _ytmusic is None:
+        return "ERROR: ytmusicapi unavailable"
+    try:
+        raw = _ytmusic.get_mood_playlists(params)
+        results = []
+        for item in raw:
+            vid = item.get("videoId", "")
+            if not vid:
+                continue
+            artists = item.get("artists") or []
+            artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+            thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+            results.append(_card(vid, item.get("title", "Unknown"), artist, thumbnail))
+        return json.dumps(results)
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unchanged functions
+# ─────────────────────────────────────────────────────────────────────────────
 
 def search_tracks(query: str, limit: int = 15) -> str:
     """Search YouTube Music for tracks.
@@ -81,7 +311,6 @@ def search_tracks(query: str, limit: int = 15) -> str:
     if not query:
         return "ERROR: empty query"
 
-    # ── ytmusicapi path ───────────────────────────────────────────────────────
     if _ytmusic is not None:
         try:
             raw = _ytmusic.search(query, filter="songs", limit=limit)
@@ -91,17 +320,16 @@ def search_tracks(query: str, limit: int = 15) -> str:
                 if not video_id:
                     continue
                 title = item.get("title", "Unknown")
-                # artists is a list of dicts with 'name'
                 artists = item.get("artists") or []
                 artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
-                duration_str = item.get("duration") or ""          # e.g. "3:45"
+                duration_str  = item.get("duration") or ""
                 duration_secs = item.get("duration_seconds") or 0
-                thumbnails = item.get("thumbnails") or []
-                thumbnail = _best_thumbnail(thumbnails)
+                thumbnails    = item.get("thumbnails") or []
+                thumbnail     = _best_thumbnail(thumbnails)
                 results.append({
                     "videoId": video_id,
-                    "title": title,
-                    "artist": artist,
+                    "title":   title,
+                    "artist":  artist,
                     "duration": duration_str,
                     "durationSeconds": duration_secs,
                     "thumbnail": thumbnail,
@@ -109,11 +337,9 @@ def search_tracks(query: str, limit: int = 15) -> str:
                 })
             if results:
                 return json.dumps(results)
-            # fall through to yt-dlp if no results
         except Exception:
-            pass  # fall through
+            pass
 
-    # ── yt-dlp fallback ───────────────────────────────────────────────────────
     try:
         opts = {
             "quiet": True,
@@ -128,12 +354,12 @@ def search_tracks(query: str, limit: int = 15) -> str:
         for e in entries[:limit]:
             if not e:
                 continue
-            video_id = e.get("id") or e.get("url", "")
+            video_id      = e.get("id") or e.get("url", "")
             duration_secs = e.get("duration") or 0
             results.append({
                 "videoId": video_id,
-                "title": e.get("title", "Unknown"),
-                "artist": e.get("uploader") or e.get("channel") or "",
+                "title":   e.get("title", "Unknown"),
+                "artist":  e.get("uploader") or e.get("channel") or "",
                 "duration": _format_duration(duration_secs),
                 "durationSeconds": duration_secs,
                 "thumbnail": e.get("thumbnail") or "",
@@ -145,9 +371,7 @@ def search_tracks(query: str, limit: int = 15) -> str:
 
 
 def get_stream_url(url: str) -> str:
-    """Extract a direct streamable audio URL without downloading.
-    Returns JSON with url/title/artist/thumbnail/webpage_url, or 'ERROR: ...' on failure.
-    """
+    """Extract a direct streamable audio URL without downloading."""
     try:
         query = resolve_query(url)
         info_opts = {
@@ -165,9 +389,9 @@ def get_stream_url(url: str) -> str:
 
         duration_secs = info.get("duration") or 0
         return json.dumps({
-            "url": stream_url,
-            "title": info.get("title", "Unknown"),
-            "artist": info.get("artist") or info.get("uploader") or info.get("channel") or "",
+            "url":      stream_url,
+            "title":    info.get("title", "Unknown"),
+            "artist":   info.get("artist") or info.get("uploader") or info.get("channel") or "",
             "thumbnail": info.get("thumbnail", ""),
             "duration": _format_duration(duration_secs),
             "durationSeconds": duration_secs,
@@ -175,11 +399,10 @@ def get_stream_url(url: str) -> str:
         })
     except Exception as e:
         return f"ERROR: {str(e)}"
+
+
 def get_stream_url_by_id(video_id: str) -> str:
-    """Resolve a stream URL directly from a YouTube video ID.
-    Faster than get_stream_url() — no search step, just direct resolution.
-    Returns same JSON schema as get_stream_url().
-    """
+    """Resolve a stream URL directly from a YouTube video ID."""
     url = f"https://music.youtube.com/watch?v={video_id}"
     try:
         info_opts = {
@@ -197,9 +420,9 @@ def get_stream_url_by_id(video_id: str) -> str:
 
         duration_secs = info.get("duration") or 0
         return json.dumps({
-            "url": stream_url,
-            "title": info.get("title", "Unknown"),
-            "artist": info.get("artist") or info.get("uploader") or info.get("channel") or "",
+            "url":      stream_url,
+            "title":    info.get("title", "Unknown"),
+            "artist":   info.get("artist") or info.get("uploader") or info.get("channel") or "",
             "thumbnail": info.get("thumbnail", ""),
             "duration": _format_duration(duration_secs),
             "durationSeconds": duration_secs,
@@ -207,6 +430,7 @@ def get_stream_url_by_id(video_id: str) -> str:
         })
     except Exception as e:
         return f"ERROR: {str(e)}"
+
 
 def download_audio(url: str, download_dir: str) -> str:
     try:
@@ -220,11 +444,11 @@ def download_audio(url: str, download_dir: str) -> str:
         with yt_dlp.YoutubeDL(info_opts) as ydl:
             info = first_entry(ydl.extract_info(query, download=False))
 
-        raw_title = info.get("title", "audio")
-        title = sanitize(raw_title)
-        artist = info.get("artist") or info.get("uploader") or info.get("channel") or ""
+        raw_title     = info.get("title", "audio")
+        title         = sanitize(raw_title)
+        artist        = info.get("artist") or info.get("uploader") or info.get("channel") or ""
         thumbnail_url = info.get("thumbnail", "")
-        video_url = info.get("webpage_url") or info.get("url") or query
+        video_url     = info.get("webpage_url") or info.get("url") or query
 
         thumb_path = ""
         if thumbnail_url:
@@ -246,7 +470,7 @@ def download_audio(url: str, download_dir: str) -> str:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             dl_info = first_entry(ydl.extract_info(video_url, download=True))
 
-        ext = dl_info.get("ext", "m4a")
+        ext        = dl_info.get("ext", "m4a")
         final_path = os.path.join(download_dir, f"{title}.{ext}")
         if not os.path.exists(final_path):
             return "ERROR: File not found after download."
@@ -260,33 +484,31 @@ def download_audio(url: str, download_dir: str) -> str:
         return final_path
     except Exception as e:
         return f"ERROR: {str(e)}"
+
+
 def get_watch_playlist(video_id: str, limit: int = 10) -> str:
-    """Fetch autoplay candidates for a given videoId using ytmusicapi.
-    Returns JSON array of up to `limit` tracks with:
-      videoId, title, artist, durationSeconds, thumbnail
-    Returns 'ERROR: ...' if unavailable.
-    """
+    """Fetch autoplay candidates for a given videoId using ytmusicapi."""
     if _ytmusic is None:
         return "ERROR: ytmusicapi unavailable"
     try:
-        data = _ytmusic.get_watch_playlist(videoId=video_id, limit=limit + 1)
+        data   = _ytmusic.get_watch_playlist(videoId=video_id, limit=limit + 1)
         tracks = data.get("tracks", [])
         results = []
         for item in tracks:
             vid = item.get("videoId", "")
-            if not vid or vid == video_id:  # skip seed track
+            if not vid or vid == video_id:
                 continue
-            artists = item.get("artists") or []
-            artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+            artists   = item.get("artists") or []
+            artist    = ", ".join(a.get("name", "") for a in artists if a.get("name"))
             thumbnails = item.get("thumbnail") or []
-            thumbnail = _best_thumbnail(thumbnails)
+            thumbnail  = _best_thumbnail(thumbnails)
             duration_secs = item.get("length") or 0
             results.append({
-                "videoId": vid,
-                "title": item.get("title", "Unknown"),
-                "artist": artist,
+                "videoId":         vid,
+                "title":           item.get("title", "Unknown"),
+                "artist":          artist,
                 "durationSeconds": duration_secs,
-                "thumbnail": thumbnail,
+                "thumbnail":       thumbnail,
             })
             if len(results) >= limit:
                 break
