@@ -1347,5 +1347,78 @@
             app:layout_constraintTop_toBottomOf="@id/lyricsBackBtn" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- ═══════════════════════════════════════════
+         PLAYLIST/ALBUM BROWSE SHEET (home page)
+         Same pattern as searchSheet.
+         Add this just before the closing </androidx.coordinatorlayout.widget.CoordinatorLayout>
+         tag, after the searchSheet FrameLayout.
+         ═══════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/playlistBrowseSheet"
+        android:layout_width="match_parent"
+        android:layout_height="520dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_bottom_sheet"
+        android:translationY="999dp"
+        android:elevation="36dp"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/playlistBrowseTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text=""
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:letterSpacing="0.01" />
+
+                <ImageButton
+                    android:id="@+id/closePlaylistBrowseBtn"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_close"
+                    android:tint="#80FFFFFF"
+                    android:contentDescription="Close" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/playlistBrowseProgress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_horizontal"
+                android:indeterminate="true"
+                android:indeterminateTint="#00FFA2"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/playlistBrowseRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp" />
+
+        </LinearLayout>
+    </FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
