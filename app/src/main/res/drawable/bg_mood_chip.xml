@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Pill background for mood chips.
+    Fill: #1E1E1E  (slightly lighter than app background)
+    Stroke: accent colour at 60% opacity
+    Corner radius: 18dp (fully rounded at 36dp chip height)
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <solid android:color="#1E1E1E" />
+
+    <stroke
+        android:width="1dp"
+        android:color="#99BB86FC" />   <!-- accent #BB86FC @ 60% -->
+
+    <corners android:radius="18dp" />
+
+</shape>
