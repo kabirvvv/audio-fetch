@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
             uiHandler.postDelayed(this, 250)
         }
     }
-
+    private lateinit var recentlyPlayedAdapter: HomeCardAdapter
     private lateinit var trackAdapter: TrackAdapter
     private lateinit var libraryAdapter: LibraryAdapter
     private lateinit var playlistsAdapter: PlaylistsAdapter
@@ -411,23 +411,99 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-    // ─────────────────────────────────────────────
+   // ─────────────────────────────────────────────
     // HOME DATA
     // ─────────────────────────────────────────────
 
+ 
+
+    // Call this at the end of setupUI()
+    private fun setupHomeAdapters() {
+        recentlyPlayedAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
+        binding.recentlyPlayedRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
+            adapter = recentlyPlayedAdapter
+        }
+    }
+
     private fun loadHomeData() {
-        showShimmer()
+        // Fix greeting based on actual time
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        binding.homeGreeting.text = when {
+            hour < 12 -> "Good morning"
+            hour < 17 -> "Good afternoon"
+            else      -> "Good evening"
+        }
+
+        // Layer 1: local — instant, no shimmer
         val history = LibraryManager.getHistory().takeLast(10).reversed()
-        binding.recentlyPlayedSection.isVisible = history.isNotEmpty()
-        // TODO: wire recentlyPlayedRecycler with a HomeCardAdapter when ready
-        // Online shelves loaded here in a future session
-        hideShimmer()
-        homeCacheTime = System.currentTimeMillis()
+        if (history.isNotEmpty()) {
+            recentlyPlayedAdapter.submitList(history.map { track ->
+                HomeCard(
+                    videoId   = track.videoId ?: "",
+                    title     = track.title,
+                    artist    = track.artist,
+                    thumbnail = track.thumbnailUrl,
+                    type      = HomeCardType.TRACK,
+                )
+            })
+            binding.recentlyPlayedSection.isVisible = true
+        } else {
+            binding.recentlyPlayedSection.isVisible = false
+        }
+
+        // Layer 2: online — shimmer while loading
+        binding.homeShelvesContainer.removeAllViews()
+        showShimmer()
+
+        lifecycleScope.launch {
+            val shelves = fetchOnlineShelves()
+            hideShimmer()
+            if (shelves.isNotEmpty()) renderShelves(shelves)
+            homeCacheTime = System.currentTimeMillis()
+        }
     }
 
     private fun renderShelves(shelves: List<HomeShelf>) {
         homeDataCache = shelves
-        // TODO: dynamically inflate shelf rows into binding.homeShelvesContainer
+        binding.homeShelvesContainer.removeAllViews()
+
+        shelves.forEach { shelf ->
+            if (shelf.items.isEmpty()) return@forEach
+
+            // Section label
+            val header = TextView(this).apply {
+                text = shelf.title
+                textSize = 15f
+                setTextColor(0xFFFFFFFF.toInt())
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                val px = (20 * resources.displayMetrics.density).toInt()
+                setPadding(px, 0, px, (10 * resources.displayMetrics.density).toInt())
+                layoutParams = ViewGroup.MarginLayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (4 * resources.displayMetrics.density).toInt() }
+            }
+
+            // Horizontal row
+            val rv = RecyclerView(this).apply {
+                layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
+                adapter = HomeCardAdapter { card -> onHomeCardClick(card) }
+                    .also { it.submitList(shelf.items) }
+                overScrollMode = View.OVER_SCROLL_NEVER
+                isNestedScrollingEnabled = false
+                val ph = (12 * resources.displayMetrics.density).toInt()
+                setPadding(ph, 0, ph, (20 * resources.displayMetrics.density).toInt())
+                clipToPadding = false
+                layoutParams = ViewGroup.MarginLayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            binding.homeShelvesContainer.addView(header)
+            binding.homeShelvesContainer.addView(rv)
+        }
     }
 
     private fun showShimmer() {
@@ -436,6 +512,77 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideShimmer() {
         binding.homeShimmerContainer.isVisible = false
+    }
+
+    // Returns empty list until get_home() is added to main.py
+    private suspend fun fetchOnlineShelves(): List<HomeShelf> {
+        return try {
+            val result = withContext(Dispatchers.IO) {
+                Python.getInstance().getModule("main")
+                    .callAttr("get_home").toString()
+            }
+            if (result.startsWith("ERROR")) return emptyList()
+            val arr = JSONArray(result)
+            (0 until arr.length()).map { i ->
+                val obj   = arr.getJSONObject(i)
+                val items = obj.getJSONArray("items")
+                HomeShelf(
+                    title = obj.getString("title"),
+                    items = (0 until items.length()).map { j ->
+                        val c = items.getJSONObject(j)
+                        HomeCard(
+                            videoId    = c.optString("videoId"),
+                            playlistId = c.optString("playlistId").ifEmpty { null },
+                            title      = c.optString("title", "Unknown"),
+                            artist     = c.optString("artist", ""),
+                            thumbnail  = c.optString("thumbnail", ""),
+                            type       = when (c.optString("type")) {
+                                "album"    -> HomeCardType.ALBUM
+                                "playlist" -> HomeCardType.PLAYLIST
+                                else       -> HomeCardType.TRACK
+                            }
+                        )
+                    }
+                )
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun onHomeCardClick(card: HomeCard) {
+        when (card.type) {
+            HomeCardType.TRACK -> {
+                if (card.videoId.isEmpty()) return
+                streamFromHomeCard(card)
+            }
+            HomeCardType.ALBUM, HomeCardType.PLAYLIST ->
+                setStatus("Coming soon: ${card.title}", StatusType.NEUTRAL)
+            HomeCardType.MOOD -> { }
+        }
+    }
+
+    private fun streamFromHomeCard(card: HomeCard) {
+        setStatus("loading…", StatusType.NEUTRAL)
+        binding.progressBar.isVisible = true
+
+        lifecycleScope.launch {
+            val streamJson = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url_by_id", card.videoId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.progressBar.isVisible = false
+
+            if (streamJson.startsWith("ERROR")) {
+                setStatus(streamJson, StatusType.ERROR)
+                return@launch
+            }
+            try {
+                playStreamJson(JSONObject(streamJson), card.thumbnail)
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
+            }
+        }
     }
 
     // ─────────────────────────────────────────────
