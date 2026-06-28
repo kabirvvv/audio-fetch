@@ -888,6 +888,17 @@
                             android:tint="#00FFA2"
                             android:visibility="gone"
                             android:contentDescription="Download current track" />
+                        <ImageButton
+    android:id="@+id/dislikeBtn"
+    android:src="@drawable/ic_thumb_down"
+    android:visibility="gone"
+    ... />
+
+<ImageButton
+    android:id="@+id/likeBtn"
+    android:src="@drawable/ic_thumb_up"
+    android:visibility="gone"
+    ... />
                     </FrameLayout>
 
                     <com.audiofetch.VibeSeekBar
@@ -1266,6 +1277,32 @@
                     android:layout_marginBottom="28dp" />
 
             </LinearLayout>
+            <!-- Account section — paste this inside your settings ScrollView -->
+<TextView
+    android:text="Account"
+    ... />
+
+<!-- Signed-out state -->
+<LinearLayout
+    android:id="@+id/accountSignedOutGroup"
+    android:orientation="vertical"
+    ... >
+    <TextView android:text="Connect your YouTube Music account for personalised recommendations." ... />
+    <Button
+        android:id="@+id/connectAccountBtn"
+        android:text="Sign in with Google"
+        ... />
+</LinearLayout>
+
+<!-- Signed-in state -->
+<LinearLayout
+    android:id="@+id/accountSignedInGroup"
+    android:orientation="vertical"
+    ... >
+    <TextView android:id="@+id/accountNameText"  ... />
+    <TextView android:id="@+id/accountEmailText" ... />
+    <Button android:id="@+id/signOutBtn" android:text="Sign out" ... />
+</LinearLayout>
         </ScrollView>
     </FrameLayout>
 
