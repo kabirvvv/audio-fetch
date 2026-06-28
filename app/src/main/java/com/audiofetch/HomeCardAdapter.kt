@@ -1,4 +1,4 @@
-package com.example.audiofetch
+package com.audiofetch
 
 import android.view.LayoutInflater
 import android.view.View
@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.request.RequestOptions
-import com.example.audiofetch.R
+import com.audiofetch.R
 
 class HomeCardAdapter(
     private val onClick: (HomeCard) -> Unit,
