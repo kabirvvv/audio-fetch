@@ -515,3 +515,68 @@ def get_watch_playlist(video_id: str, limit: int = 10) -> str:
         return json.dumps(results)
     except Exception as e:
         return f"ERROR: {str(e)}"
+        
+def get_playlist_tracks(browse_id: str, limit: int = 50) -> str:
+    """Fetch tracks for an album or playlist by browseId or playlistId.
+
+    Tries get_album() first (for album browseIds starting with 'MPREb'),
+    falls back to get_playlist() for everything else.
+
+    Returns JSON array of SearchResult-compatible dicts:
+      videoId, title, artist, duration, durationSeconds, thumbnail, webpage_url
+    """
+    if not browse_id or _ytmusic is None:
+        return "ERROR: ytmusicapi unavailable"
+    try:
+        tracks = []
+
+        # Albums have browseIds starting with MPREb
+        if browse_id.startswith("MPREb"):
+            raw = _ytmusic.get_album(browse_id)
+            album_title = raw.get("title", "")
+            for item in (raw.get("tracks") or [])[:limit]:
+                vid = item.get("videoId", "")
+                if not vid:
+                    continue
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                duration_secs = item.get("duration_seconds") or 0
+                thumbnails = item.get("thumbnails") or raw.get("thumbnails") or []
+                thumbnail = _best_thumbnail(thumbnails)
+                tracks.append({
+                    "videoId":         vid,
+                    "title":           item.get("title", "Unknown"),
+                    "artist":          artist or album_title,
+                    "duration":        _format_duration(duration_secs),
+                    "durationSeconds": duration_secs,
+                    "thumbnail":       thumbnail,
+                    "webpage_url":     f"https://music.youtube.com/watch?v={vid}",
+                })
+        else:
+            # Playlist — browseId may be a VL-prefixed string or plain playlist id
+            playlist_id = browse_id
+            if browse_id.startswith("VL"):
+                playlist_id = browse_id[2:]
+            raw = _ytmusic.get_playlist(playlist_id, limit=limit)
+            for item in (raw.get("tracks") or [])[:limit]:
+                vid = item.get("videoId", "")
+                if not vid:
+                    continue
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                duration_secs = item.get("duration_seconds") or 0
+                thumbnails = item.get("thumbnails") or []
+                thumbnail = _best_thumbnail(thumbnails)
+                tracks.append({
+                    "videoId":         vid,
+                    "title":           item.get("title", "Unknown"),
+                    "artist":          artist,
+                    "duration":        _format_duration(duration_secs),
+                    "durationSeconds": duration_secs,
+                    "thumbnail":       thumbnail,
+                    "webpage_url":     f"https://music.youtube.com/watch?v={vid}",
+                })
+
+        return json.dumps(tracks)
+    except Exception as e:
+        return f"ERROR: {str(e)}"
