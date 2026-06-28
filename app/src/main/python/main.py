@@ -142,54 +142,116 @@ def _card(video_id: str, title: str, artist: str, thumbnail: str,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _fetch_quick_picks(seed_video_id: str, limit: int = 10):
-    """Fetch watch-playlist recommendations for seed_video_id."""
-    if not seed_video_id or _ytmusic is None:
+    """Fetch watch-playlist recommendations for seed_video_id.
+    Falls back to first shelf from get_home() if no seed is available.
+    """
+    if _ytmusic is None:
         return []
-    raw = json.loads(get_watch_playlist(seed_video_id, limit))
-    if isinstance(raw, list):
-        return raw          # already normalised by get_watch_playlist()
-    return []
+
+    # If we have a seed, use watch playlist
+    if seed_video_id:
+        try:
+            raw = json.loads(get_watch_playlist(seed_video_id, limit))
+            if isinstance(raw, list) and raw:
+                return raw
+        except Exception:
+            pass
+
+    # Fallback: pull first batch of tracks from ytmusicapi home
+    try:
+        shelves = _ytmusic.get_home(limit=3)
+        results = []
+        for shelf in shelves:
+            for item in shelf.get("contents") or []:
+                vid = item.get("videoId")
+                if not vid:
+                    continue
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+                results.append(_card(vid, item.get("title", "Unknown"), artist, thumbnail, "TRACK"))
+                if len(results) >= limit:
+                    return results
+        return results
+    except Exception:
+        return []
 
 
-def _fetch_trending(limit: int = 5):
+def _fetch_trending(limit: int = 15):
     """Pull shelves from ytmusicapi.get_home() and map to HomeCard lists."""
     if _ytmusic is None:
         return []
-    shelves = _ytmusic.get_home(limit=limit)
+
+    try:
+        shelves = _ytmusic.get_home(limit=limit)
+    except Exception:
+        return []
+
     results = []
     for shelf in shelves:
         shelf_title = shelf.get("title", "")
         items = []
+
         for item in shelf.get("contents") or []:
-            # Tracks
+            # ── Tracks ────────────────────────────────────────────────────────
             vid = item.get("videoId")
             if vid:
                 artists = item.get("artists") or []
                 artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
                 thumbnail = _best_thumbnail(item.get("thumbnails") or [])
                 items.append(_card(vid, item.get("title", "Unknown"), artist, thumbnail, "TRACK"))
+                continue  # processed as track — move on
+
+            # ── Albums / Playlists ────────────────────────────────────────────
+            # ytmusicapi puts the ID in different places depending on content type:
+            #   Albums:    item["browseId"]  (starts with MPREb)
+            #   Playlists: item["playlistId"] (plain) or item["browseId"] (VL-prefixed)
+            browse_id   = item.get("browseId", "")
+            playlist_id = item.get("playlistId", "")
+
+            # Determine the best ID to pass as playlistId to get_playlist_tracks()
+            if browse_id.startswith("MPREb"):
+                # Album — use browseId directly (get_playlist_tracks handles MPREb)
+                resolved_id = browse_id
+                card_type   = "ALBUM"
+            elif playlist_id:
+                # Playlist with a direct playlistId
+                resolved_id = playlist_id
+                card_type   = "PLAYLIST"
+            elif browse_id.startswith("VL"):
+                # VL-prefixed browseId — strip prefix so get_playlist() works
+                resolved_id = browse_id[2:]
+                card_type   = "PLAYLIST"
+            elif browse_id:
+                # Unknown browseId — treat as playlist and let get_playlist_tracks() figure it out
+                resolved_id = browse_id
+                card_type   = "PLAYLIST"
+            else:
+                # No usable ID — skip
                 continue
-            # Albums / playlists (have browseId)
-            browse_id = (item.get("browseId") or
-                         (item.get("navigationEndpoint") or {})
-                         .get("browseEndpoint", {}).get("browseId"))
-            playlist_id = item.get("playlistId")
-            if browse_id or playlist_id:
-                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
-                subtitle = item.get("subtitle") or item.get("description") or ""
-                card_type = "ALBUM" if "album" in shelf_title.lower() else "PLAYLIST"
-                items.append(_card(
-                    video_id="",
-                    title=item.get("title", "Unknown"),
-                    artist=subtitle,
-                    thumbnail=thumbnail,
-                    card_type=card_type,
-                    playlist_id=playlist_id or browse_id,
-                ))
+
+            thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+            subtitle  = (item.get("subtitle") or item.get("description") or "")
+            # subtitle can be a list of dicts (e.g. [{text: "2024"}, {text: " • "}, {text: "Album"}])
+            if isinstance(subtitle, list):
+                subtitle = "".join(
+                    part.get("text", "") if isinstance(part, dict) else str(part)
+                    for part in subtitle
+                )
+
+            items.append(_card(
+                video_id    = "",
+                title       = item.get("title", "Unknown"),
+                artist      = subtitle,
+                thumbnail   = thumbnail,
+                card_type   = card_type,
+                playlist_id = resolved_id,
+            ))
+
         if items:
             results.append({"shelfTitle": shelf_title, "items": items})
-    return results
 
+    return results
 
 def _fetch_moods():
     """Fetch mood/genre categories from ytmusicapi."""
