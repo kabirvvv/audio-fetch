@@ -88,6 +88,9 @@ class MainActivity : AppCompatActivity() {
     private var currentLyricLine = -1
     private lateinit var lyricsAdapter: LyricsAdapter
 
+    // ── Like state ────────────────────────────────────────────────────────────
+    private var currentLikeState = "INDIFFERENT"
+
     private val uiHandler = Handler(Looper.getMainLooper())
     private val uiRunnable = object : Runnable {
         override fun run() {
@@ -246,8 +249,16 @@ class MainActivity : AppCompatActivity() {
 
         // ── Mini player ───────────────────────────────────────────────────────
         binding.miniPlayer.setOnClickListener { showFullPlayer() }
-        // miniPlayPauseBtn must not bubble up to miniPlayer's click
         binding.miniPlayPauseBtn.setOnClickListener { togglePlayPause() }
+
+        // ── Account section in settings ───────────────────────────────────────
+        refreshAccountUI()
+        binding.connectAccountBtn.setOnClickListener { showLoginWebView() }
+        binding.signOutBtn.setOnClickListener { handleSignOut() }
+
+        // ── Like / Dislike buttons ────────────────────────────────────────────
+        binding.likeBtn.setOnClickListener    { rateCurrentTrack("LIKE") }
+        binding.dislikeBtn.setOnClickListener { rateCurrentTrack("DISLIKE") }
 
         // ── Full player swipe-down to dismiss ─────────────────────────────────
         var touchStartY = 0f
@@ -328,7 +339,6 @@ class MainActivity : AppCompatActivity() {
         selectLibraryTab(0)
         setupHomeAdapters()
         setupPlaylistBrowseSheet()
-        // Start on Home tab
         switchTab(Tab.HOME)
     }
 
@@ -417,11 +427,9 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-   // ─────────────────────────────────────────────
+    // ─────────────────────────────────────────────
     // HOME DATA
     // ─────────────────────────────────────────────
-
-    
 
     private fun setupHomeAdapters() {
         recentlyPlayedAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
@@ -439,7 +447,6 @@ class MainActivity : AppCompatActivity() {
             else      -> "Good evening"
         }
 
-        // Layer 1: local — instant
         val history = LibraryManager.getHistory().takeLast(10).reversed()
         if (history.isNotEmpty()) {
             recentlyPlayedAdapter.submitList(history.map { track ->
@@ -456,7 +463,6 @@ class MainActivity : AppCompatActivity() {
             binding.recentlyPlayedSection.isVisible = false
         }
 
-        // Layer 2: online — shimmer while loading
         binding.homeShelvesContainer.removeAllViews()
         showShimmer()
 
@@ -518,12 +524,6 @@ class MainActivity : AppCompatActivity() {
         binding.homeShimmerContainer.isVisible = false
     }
 
-    // Parses the actual shape returned by main.py get_home():
-    // {
-    //   "quick_picks": [ HomeCard, ... ],
-    //   "shelves":     [ { "shelfTitle": "...", "items": [ HomeCard, ... ] }, ... ],
-    //   "moods":       [ { "title": "...", "params": "..." }, ... ]
-    // }
     private suspend fun fetchOnlineShelves(seedVideoId: String): List<HomeShelf> {
         return try {
             val raw = withContext(Dispatchers.IO) {
@@ -535,7 +535,6 @@ class MainActivity : AppCompatActivity() {
             val root = JSONObject(raw)
             val result = mutableListOf<HomeShelf>()
 
-            // Quick picks shelf
             val quickPicks = root.optJSONArray("quick_picks")
             if (quickPicks != null && quickPicks.length() > 0) {
                 val items = (0 until quickPicks.length()).mapNotNull { i ->
@@ -544,20 +543,19 @@ class MainActivity : AppCompatActivity() {
                 if (items.isNotEmpty()) result.add(HomeShelf("Quick Picks", items))
             }
 
-          // Trending / editorial shelves
-val shelves = root.optJSONArray("shelves")
-if (shelves != null) {
-    for (i in 0 until shelves.length()) {
-        val shelf = shelves.getJSONObject(i)
-        val title = shelf.optString("shelfTitle", "").ifEmpty { "" }
-        if (title.isEmpty()) continue
-        val itemsArr = shelf.optJSONArray("items") ?: continue
-        val items = (0 until itemsArr.length()).mapNotNull { j ->
-            parseHomeCard(itemsArr.getJSONObject(j))
-        }
-        if (items.isNotEmpty()) result.add(HomeShelf(title, items))
-    }
-}
+            val shelves = root.optJSONArray("shelves")
+            if (shelves != null) {
+                for (i in 0 until shelves.length()) {
+                    val shelf = shelves.getJSONObject(i)
+                    val title = shelf.optString("shelfTitle", "").ifEmpty { "" }
+                    if (title.isEmpty()) continue
+                    val itemsArr = shelf.optJSONArray("items") ?: continue
+                    val items = (0 until itemsArr.length()).mapNotNull { j ->
+                        parseHomeCard(itemsArr.getJSONObject(j))
+                    }
+                    if (items.isNotEmpty()) result.add(HomeShelf(title, items))
+                }
+            }
 
             result
         } catch (_: Exception) { emptyList() }
@@ -586,15 +584,14 @@ if (shelves != null) {
                 if (card.videoId.isEmpty()) return
                 streamFromHomeCard(card)
             }
-           HomeCardType.ALBUM, HomeCardType.PLAYLIST -> {
-    val browseId = card.playlistId ?: return
-    showPlaylistBrowseSheet(card.title, browseId)
-}
+            HomeCardType.ALBUM, HomeCardType.PLAYLIST -> {
+                val browseId = card.playlistId ?: return
+                showPlaylistBrowseSheet(card.title, browseId)
+            }
             HomeCardType.MOOD -> { }
         }
     }
 
- 
     // ─────────────────────────────────────────────
     // LIBRARY TABS
     // ─────────────────────────────────────────────
@@ -813,7 +810,11 @@ if (shelves != null) {
                 binding.playlistSheet.visibility = View.GONE
             }.start()
     }
-     // Call this inside setupUI(), alongside the other adapter setups
+
+    // ─────────────────────────────────────────────
+    // PLAYLIST BROWSE SHEET
+    // ─────────────────────────────────────────────
+
     private fun setupPlaylistBrowseSheet() {
         playlistBrowseAdapter = SearchResultsAdapter(emptyList()) { result ->
             hidePlaylistBrowseSheet()
@@ -825,19 +826,19 @@ if (shelves != null) {
         }
         binding.closePlaylistBrowseBtn.setOnClickListener { hidePlaylistBrowseSheet() }
     }
- 
+
     private fun showPlaylistBrowseSheet(title: String, browseId: String) {
         binding.playlistBrowseTitle.text = title
         binding.playlistBrowseProgress.isVisible = true
         playlistBrowseAdapter.update(emptyList())
- 
+
         binding.scrim.visibility = View.VISIBLE
         binding.playlistBrowseSheet.visibility = View.VISIBLE
         binding.scrim.animate().alpha(0.6f).setDuration(300).start()
         binding.playlistBrowseSheet.animate()
             .translationY(0f).setDuration(400)
             .setInterpolator(DecelerateInterpolator(2f)).start()
- 
+
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 try {
@@ -846,7 +847,7 @@ if (shelves != null) {
                 } catch (e: Exception) { "ERROR: ${e.message}" }
             }
             binding.playlistBrowseProgress.isVisible = false
- 
+
             if (result.startsWith("ERROR")) {
                 setStatus(result, StatusType.ERROR)
                 hidePlaylistBrowseSheet()
@@ -873,7 +874,7 @@ if (shelves != null) {
             }
         }
     }
- 
+
     private fun hidePlaylistBrowseSheet() {
         binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
             binding.scrim.visibility = View.GONE
@@ -909,7 +910,6 @@ if (shelves != null) {
                 binding.searchSheet.visibility = View.GONE
             }.start()
     }
-    
 
     // ─────────────────────────────────────────────
     // LYRICS SHEET
@@ -1188,6 +1188,7 @@ if (shelves != null) {
                         fetchAndAppendAutoplay(tracks[idx].videoId)
                     }
                 }
+                resetLikeUI()
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -1333,7 +1334,6 @@ if (shelves != null) {
     // ─────────────────────────────────────────────
 
     private fun setTrackInfo(track: Track) {
-        // Full player
         binding.trackTitle.text  = track.title
         binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
         if (track.thumbnailUrl.isNotEmpty()) {
@@ -1355,7 +1355,6 @@ if (shelves != null) {
         } else {
             loadAlbumArt(track.uri)
         }
-        // Mini player sync
         updateMiniPlayer(track)
     }
 
@@ -1667,7 +1666,6 @@ if (shelves != null) {
         binding.downloadBtn.isVisible = true
         setStatus("streaming: $title", StatusType.SUCCESS)
 
-        // Show mini player and bring up full player
         updateMiniPlayer(streamTrack)
         showMiniPlayer()
         showFullPlayer()
@@ -1678,29 +1676,30 @@ if (shelves != null) {
     }
 
     private fun streamFromHomeCard(card: HomeCard) {
-    setStatus("loading…", StatusType.NEUTRAL)
-    binding.progressBar.isVisible = true
+        setStatus("loading…", StatusType.NEUTRAL)
+        binding.progressBar.isVisible = true
 
-    lifecycleScope.launch {
-        val streamJson = withContext(Dispatchers.IO) {
+        lifecycleScope.launch {
+            val streamJson = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url_by_id", card.videoId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.progressBar.isVisible = false
+
+            if (streamJson.startsWith("ERROR")) {
+                setStatus(streamJson, StatusType.ERROR)
+                return@launch
+            }
             try {
-                Python.getInstance().getModule("main")
-                    .callAttr("get_stream_url_by_id", card.videoId).toString()
-            } catch (e: Exception) { "ERROR: ${e.message}" }
-        }
-        binding.progressBar.isVisible = false
-
-        if (streamJson.startsWith("ERROR")) {
-            setStatus(streamJson, StatusType.ERROR)
-            return@launch
-        }
-        try {
-            playStreamJson(JSONObject(streamJson), card.thumbnail)
-        } catch (e: Exception) {
-            setStatus("ERROR: ${e.message}", StatusType.ERROR)
+                playStreamJson(JSONObject(streamJson), card.thumbnail)
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
+            }
         }
     }
-}
+
     // ─────────────────────────────────────────────
     // AUTOPLAY
     // ─────────────────────────────────────────────
@@ -1835,6 +1834,128 @@ if (shelves != null) {
     }
 
     // ─────────────────────────────────────────────
+    // ACCOUNT
+    // ─────────────────────────────────────────────
+
+    private fun refreshAccountUI() {
+        val authed = AccountManager.isAuthenticated(this)
+        binding.accountSignedOutGroup.isVisible = !authed
+        binding.accountSignedInGroup.isVisible  = authed
+        if (authed) {
+            binding.accountNameText.text  = AccountManager.getDisplayName(this)
+            binding.accountEmailText.text = AccountManager.getEmail(this)
+        }
+        binding.likeBtn.isVisible    = authed
+        binding.dislikeBtn.isVisible = authed
+    }
+
+    private fun showLoginWebView() {
+        val webView = android.webkit.WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+            webViewClient = object : android.webkit.WebViewClient() {
+                override fun onPageFinished(view: android.webkit.WebView, url: String) {
+                    if (url.contains("music.youtube.com") && !url.contains("accounts.google.com")) {
+                        val cookies = android.webkit.CookieManager.getInstance().getCookie(url) ?: return
+                        if (cookies.contains("SAPISID") || cookies.contains("__Secure-3PAPISID")) {
+                            handleCookies(cookies)
+                        }
+                    }
+                }
+            }
+            loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Sign in to YouTube Music")
+            .setView(webView)
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun handleCookies(cookies: String) {
+        setStatus("connecting account…", StatusType.NEUTRAL)
+        binding.progressBar.isVisible = true
+
+        lifecycleScope.launch {
+            val result = AccountManager.setupFromCookies(cookies)
+            binding.progressBar.isVisible = false
+
+            result.fold(
+                onSuccess = { name ->
+                    val json = withContext(Dispatchers.IO) {
+                        Python.getInstance().getModule("main")
+                            .callAttr("get_account_info").toString()
+                    }
+                    val info = JSONObject(json)
+                    AccountManager.saveAccount(
+                        this@MainActivity,
+                        info.optString("name", name),
+                        info.optString("email", "")
+                    )
+                    refreshAccountUI()
+                    homeCacheTime = 0L
+                    if (currentTab == Tab.HOME) loadHomeData()
+                    setStatus("signed in as $name", StatusType.SUCCESS)
+                },
+                onFailure = { e ->
+                    setStatus("sign in failed: ${e.message}", StatusType.ERROR)
+                }
+            )
+        }
+    }
+
+    private fun handleSignOut() {
+        AlertDialog.Builder(this)
+            .setMessage("Sign out of YouTube Music?")
+            .setPositiveButton("Sign out") { _, _ ->
+                lifecycleScope.launch {
+                    AccountManager.signOut()
+                    AccountManager.clearAccount(this@MainActivity)
+                    refreshAccountUI()
+                    resetLikeUI()
+                    homeCacheTime = 0L
+                    if (currentTab == Tab.HOME) loadHomeData()
+                    setStatus("signed out", StatusType.NEUTRAL)
+                }
+            }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    // ─────────────────────────────────────────────
+    // LIKE / DISLIKE
+    // ─────────────────────────────────────────────
+
+    private fun rateCurrentTrack(rating: String) {
+        val videoId = tracks.getOrNull(currentIndex)?.videoId ?: run {
+            setStatus("no track playing", StatusType.NEUTRAL)
+            return
+        }
+        val newRating = if (currentLikeState == rating) "INDIFFERENT" else rating
+        currentLikeState = newRating
+        updateLikeUI(newRating)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            Python.getInstance().getModule("main")
+                .callAttr("rate_song", videoId, newRating)
+        }
+    }
+
+    private fun updateLikeUI(rating: String) {
+        val accent = currentTheme.accentColor
+        val dim    = Color.argb(100, 255, 255, 255)
+        binding.likeBtn.setColorFilter(if (rating == "LIKE") accent else dim)
+        binding.dislikeBtn.setColorFilter(if (rating == "DISLIKE") accent else dim)
+    }
+
+    private fun resetLikeUI() {
+        currentLikeState = "INDIFFERENT"
+        updateLikeUI("INDIFFERENT")
+    }
+
+    // ─────────────────────────────────────────────
     // STATUS
     // ─────────────────────────────────────────────
 
@@ -1848,4 +1969,4 @@ if (shelves != null) {
             StatusType.NEUTRAL -> R.color.status_muted
         }))
     }
-}
+} 
