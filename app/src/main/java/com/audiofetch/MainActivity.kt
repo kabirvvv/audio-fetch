@@ -324,7 +324,7 @@ class MainActivity : AppCompatActivity() {
         setupTimerChips()
         setupThemeGrid()
         selectLibraryTab(0)
-
+        setupHomeAdapters()
         // Start on Home tab
         switchTab(Tab.HOME)
     }
