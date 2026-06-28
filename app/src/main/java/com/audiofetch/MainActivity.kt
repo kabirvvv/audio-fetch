@@ -592,20 +592,7 @@ if (shelves != null) {
         }
     }
 
-  private fun onHomeCardClick(card: HomeCard) {
-    when (card.type) {
-        HomeCardType.TRACK -> {
-            if (card.videoId.isEmpty()) return
-            streamFromHomeCard(card)
-        }
-        HomeCardType.ALBUM, HomeCardType.PLAYLIST -> {
-            val browseId = card.playlistId ?: return
-            showPlaylistBrowseSheet(card.title, browseId)
-        }
-        HomeCardType.MOOD -> { }
-    }
-}
-
+ 
     // ─────────────────────────────────────────────
     // LIBRARY TABS
     // ─────────────────────────────────────────────
@@ -824,6 +811,77 @@ if (shelves != null) {
                 binding.playlistSheet.visibility = View.GONE
             }.start()
     }
+     // Call this inside setupUI(), alongside the other adapter setups
+    private fun setupPlaylistBrowseSheet() {
+        playlistBrowseAdapter = SearchResultsAdapter(emptyList()) { result ->
+            hidePlaylistBrowseSheet()
+            streamFromSearchResult(result)
+        }
+        binding.playlistBrowseRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = playlistBrowseAdapter
+        }
+        binding.closePlaylistBrowseBtn.setOnClickListener { hidePlaylistBrowseSheet() }
+    }
+ 
+    private fun showPlaylistBrowseSheet(title: String, browseId: String) {
+        binding.playlistBrowseTitle.text = title
+        binding.playlistBrowseProgress.isVisible = true
+        playlistBrowseAdapter.update(emptyList())
+ 
+        binding.scrim.visibility = View.VISIBLE
+        binding.playlistBrowseSheet.visibility = View.VISIBLE
+        binding.scrim.animate().alpha(0.6f).setDuration(300).start()
+        binding.playlistBrowseSheet.animate()
+            .translationY(0f).setDuration(400)
+            .setInterpolator(DecelerateInterpolator(2f)).start()
+ 
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_playlist_tracks", browseId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.playlistBrowseProgress.isVisible = false
+ 
+            if (result.startsWith("ERROR")) {
+                setStatus(result, StatusType.ERROR)
+                hidePlaylistBrowseSheet()
+                return@launch
+            }
+            try {
+                val arr = JSONArray(result)
+                val list = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    SearchResult(
+                        videoId         = obj.optString("videoId"),
+                        title           = obj.optString("title", "Unknown"),
+                        artist          = obj.optString("artist", ""),
+                        duration        = obj.optString("duration", ""),
+                        durationSeconds = obj.optInt("durationSeconds", 0),
+                        thumbnail       = obj.optString("thumbnail", ""),
+                        webpageUrl      = obj.optString("webpage_url", ""),
+                    )
+                }
+                playlistBrowseAdapter.update(list)
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
+                hidePlaylistBrowseSheet()
+            }
+        }
+    }
+ 
+    private fun hidePlaylistBrowseSheet() {
+        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
+            binding.scrim.visibility = View.GONE
+        }.start()
+        binding.playlistBrowseSheet.animate()
+            .translationY(binding.playlistBrowseSheet.height.toFloat() + 100f)
+            .setDuration(300).withEndAction {
+                binding.playlistBrowseSheet.visibility = View.GONE
+            }.start()
+    }
 
     // ─────────────────────────────────────────────
     // SEARCH SHEET
@@ -849,6 +907,7 @@ if (shelves != null) {
                 binding.searchSheet.visibility = View.GONE
             }.start()
     }
+    
 
     // ─────────────────────────────────────────────
     // LYRICS SHEET
