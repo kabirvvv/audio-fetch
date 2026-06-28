@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.request.RequestOptions
-import com.audiofetch.R
 
 class HomeCardAdapter(
     private val onClick: (HomeCard) -> Unit,
@@ -25,6 +24,7 @@ class HomeCardAdapter(
         fun bind(card: HomeCard) {
             title.text  = card.title
             artist.text = card.artist
+            artist.visibility = if (card.artist.isBlank()) View.GONE else View.VISIBLE
 
             Glide.with(art.context)
                 .load(card.thumbnail.ifBlank { null })
@@ -54,13 +54,11 @@ class HomeCardAdapter(
         private val DIFF = object : DiffUtil.ItemCallback<HomeCard>() {
             override fun areItemsTheSame(a: HomeCard, b: HomeCard): Boolean =
                 when {
-                    !a.videoId.isNullOrEmpty()  -> a.videoId    == b.videoId
-                    a.playlistId != null         -> a.playlistId == b.playlistId
-                    else                         -> a.title      == b.title
+                    a.videoId.isNotEmpty() -> a.videoId    == b.videoId
+                    a.playlistId != null   -> a.playlistId == b.playlistId
+                    else                   -> a.title      == b.title
                 }
-
-            override fun areContentsTheSame(a: HomeCard, b: HomeCard): Boolean =
-                a == b
+            override fun areContentsTheSame(a: HomeCard, b: HomeCard): Boolean = a == b
         }
     }
 }
