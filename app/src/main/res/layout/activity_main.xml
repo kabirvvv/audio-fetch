@@ -14,360 +14,339 @@
         android:background="#020503" />
 
     <!-- ═══════════════════════════════════════════
-         PLAYER CONTAINER (default visible)
+         TAB 1: SEARCH CONTAINER
          ═══════════════════════════════════════════ -->
     <LinearLayout
-        android:id="@+id/playerContainer"
+        android:id="@+id/searchContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingBottom="120dp"
+        android:visibility="gone">
 
-        <ScrollView
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:scrollbars="none"
-            android:overScrollMode="never">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="56dp"
+            android:paddingBottom="16dp">
 
+            <!-- Top bar -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginBottom="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="AudioFetch"
+                    android:textColor="#33FFFFFF"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.15"
+                    android:fontFamily="sans-serif-medium" />
+
+                <ImageButton
+                    android:id="@+id/menuBtn"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center_vertical|end"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_menu_dots"
+                    android:tint="#80FFFFFF"
+                    android:contentDescription="Settings" />
+            </FrameLayout>
+
+            <!-- Search input -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="8dp">
+
+                <EditText
+                    android:id="@+id/urlInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_input"
+                    android:hint="@string/hint_search"
+                    android:textColorHint="#40FFFFFF"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:letterSpacing="0.05"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="16dp"
+                    android:gravity="center_vertical"
+                    android:imeOptions="actionGo"
+                    android:inputType="textUri"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+            </FrameLayout>
+
+            <!-- Fetch button -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="24dp"
-                android:paddingTop="56dp"
-                android:paddingBottom="32dp">
+                android:orientation="horizontal"
+                android:gravity="end">
 
-                <!-- Top bar: title + menu button -->
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginBottom="24dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:text="AudioFetch"
-                        android:textColor="#33FFFFFF"
-                        android:textSize="11sp"
-                        android:letterSpacing="0.15"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <ImageButton
-                        android:id="@+id/menuBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_gravity="center_vertical|end"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_menu_dots"
-                        android:tint="#80FFFFFF"
-                        android:contentDescription="Settings" />
-                </FrameLayout>
-
-                <!-- Search / URL input + fetch button -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginBottom="40dp">
-
-                    <!-- Input row -->
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp">
-
-                        <EditText
-                            android:id="@+id/urlInput"
-                            android:layout_width="match_parent"
-                            android:layout_height="56dp"
-                            android:background="@drawable/bg_input"
-                            android:hint="@string/hint_search"
-                            android:textColorHint="#40FFFFFF"
-                            android:textColor="#FFFFFF"
-                            android:textSize="14sp"
-                            android:letterSpacing="0.05"
-                            android:paddingStart="24dp"
-                            android:paddingEnd="16dp"
-                            android:gravity="center_vertical"
-                            android:imeOptions="actionGo"
-                            android:inputType="textUri"
-                            android:maxLines="1"
-                            android:singleLine="true" />
-                    </FrameLayout>
-
-                    <!-- Fetch button row (stream is now default action) -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="end">
-
-                        <ImageButton
-                            android:id="@+id/fetchBtn"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_search"
-                            android:tint="#00FFA2"
-                            android:contentDescription="Stream" />
-
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Album art with glow -->
-                <FrameLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginBottom="32dp">
-
-                    <View
-                        android:id="@+id/artGlow"
-                        android:layout_width="260dp"
-                        android:layout_height="260dp"
-                        android:layout_gravity="center"
-                        android:background="@drawable/bg_glow"
-                        android:alpha="0" />
-
-                    <ImageView
-                        android:id="@+id/albumArt"
-                        android:layout_width="220dp"
-                        android:layout_height="220dp"
-                        android:layout_gravity="center"
-                        android:background="@drawable/bg_album_art_default"
-                        android:scaleType="centerCrop"
-                        android:clipToOutline="true"
-                        android:outlineProvider="background"
-                        android:elevation="8dp"
-                        android:contentDescription="Album art" />
-                </FrameLayout>
-
-                <!-- Track info -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginBottom="24dp">
-
-                    <TextView
-                        android:id="@+id/trackTitle"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Vibe Check"
-                        android:textColor="#FFFFFF"
-                        android:textSize="22sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:letterSpacing="-0.02"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:gravity="center" />
-
-                    <TextView
-                        android:id="@+id/trackArtist"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Ready to load…"
-                        android:textColor="#80FFFFFF"
-                        android:textSize="13sp"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:gravity="center" />
-                </LinearLayout>
-
-                <!-- Progress area + download button -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginBottom="8dp">
-
-                    <!-- Time row with download button tucked on the right -->
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:id="@+id/currentTime"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="0:00"
-                                android:textColor="#80FFFFFF"
-                                android:textSize="11sp"
-                                android:fontFamily="monospace" />
-
-                            <!-- Spacer so totalTime stays centred even with download btn -->
-                            <View
-                                android:layout_width="32dp"
-                                android:layout_height="1dp" />
-
-                            <TextView
-                                android:id="@+id/totalTime"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="0:00"
-                                android:textColor="#80FFFFFF"
-                                android:textSize="11sp"
-                                android:fontFamily="monospace"
-                                android:gravity="end" />
-                        </LinearLayout>
-
-                        <!-- Download button: top-right corner, hidden until streaming -->
-                        <ImageButton
-                            android:id="@+id/downloadBtn"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:layout_gravity="center_vertical|end"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_download"
-                            android:tint="#00FFA2"
-                            android:visibility="gone"
-                            android:contentDescription="Download current track" />
-                    </FrameLayout>
-
-                    <com.audiofetch.VibeSeekBar
-                        android:id="@+id/seekBar"
-                        android:layout_width="match_parent"
-                        android:layout_height="20dp" />
-                </LinearLayout>
-
-                <!-- Visualizer -->
-                <com.audiofetch.VibeVisualizer
-                    android:id="@+id/visualizer"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:layout_marginBottom="24dp" />
-
-                <!-- Playback controls -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:layout_marginBottom="32dp">
-
-                    <ImageButton
-                        android:id="@+id/playlistBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_playlist"
-                        android:tint="#60FFFFFF"
-                        android:layout_marginEnd="16dp"
-                        android:contentDescription="Queue" />
-
-                    <ImageButton
-                        android:id="@+id/prevBtn"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_skip_prev"
-                        android:tint="#FFFFFF"
-                        android:layout_marginEnd="8dp"
-                        android:contentDescription="Previous" />
-
-                    <FrameLayout
-                        android:id="@+id/playPauseBtn"
-                        android:layout_width="72dp"
-                        android:layout_height="72dp"
-                        android:background="@drawable/bg_play_button"
-                        android:layout_marginHorizontal="8dp"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <ImageView
-                            android:id="@+id/playIcon"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_play"
-                            android:tint="#020503"
-                            android:contentDescription="Play" />
-
-                        <ImageView
-                            android:id="@+id/pauseIcon"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_pause"
-                            android:tint="#020503"
-                            android:visibility="gone"
-                            android:contentDescription="Pause" />
-                    </FrameLayout>
-
-                    <ImageButton
-                        android:id="@+id/nextBtn"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_skip_next"
-                        android:tint="#FFFFFF"
-                        android:layout_marginStart="8dp"
-                        android:contentDescription="Next" />
-
-                    <ImageButton
-                        android:id="@+id/repeatBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_repeat"
-                        android:tint="#60FFFFFF"
-                        android:layout_marginStart="16dp"
-                        android:contentDescription="Repeat" />
-                    <ImageButton
-                        android:id="@+id/lyricsBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_lyrics"
-                        android:tint="#80FFFFFF"
-                        android:alpha="0.5"
-                        android:contentDescription="Lyrics" />
-                </LinearLayout>
-
-                <!-- Status -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <ProgressBar
-                        android:id="@+id/progressBar"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:indeterminate="true"
-                        android:indeterminateTint="#00FFA2"
-                        android:visibility="gone"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/statusText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textSize="11sp"
-                        android:textColor="#60FFFFFF"
-                        android:gravity="center"
-                        android:letterSpacing="0.05" />
-                </LinearLayout>
-
+                <ImageButton
+                    android:id="@+id/fetchBtn"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_search"
+                    android:tint="#00FFA2"
+                    android:contentDescription="Stream" />
             </LinearLayout>
-        </ScrollView>
+        </LinearLayout>
+
+        <!-- Status -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="24dp">
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:indeterminate="true"
+                android:indeterminateTint="#00FFA2"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="#60FFFFFF"
+                android:gravity="center"
+                android:letterSpacing="0.05" />
+        </LinearLayout>
 
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════
-         LIBRARY CONTAINER (hidden by default)
+         TAB 2: HOME CONTAINER
+         ═══════════════════════════════════════════ -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/homeContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:paddingBottom="120dp"
+        android:clipToPadding="false"
+        android:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="56dp">
+
+            <!-- Greeting -->
+            <TextView
+                android:id="@+id/homeGreeting"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="20dp"
+                android:paddingBottom="16dp"
+                android:text="Good evening"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="-0.02" />
+
+            <!-- ── LAYER 1: LOCAL (instant) ── -->
+
+            <!-- Recently Played -->
+            <LinearLayout
+                android:id="@+id/recentlyPlayedSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="20dp"
+                    android:paddingBottom="10dp"
+                    android:text="Recently Played"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recentlyPlayedRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="20dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            </LinearLayout>
+
+            <!-- ── LAYER 2: ONLINE (loads in background) ── -->
+
+            <!-- Shimmer placeholder: shown while online shelves load -->
+            <LinearLayout
+                android:id="@+id/homeShimmerContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:visibility="gone">
+
+                <!-- Shimmer row 1 -->
+                <View
+                    android:layout_width="120dp"
+                    android:layout_height="14dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_shimmer_pill" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="24dp">
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_shimmer_card" />
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_shimmer_card" />
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:background="@drawable/bg_shimmer_card" />
+                </LinearLayout>
+
+                <!-- Shimmer row 2 -->
+                <View
+                    android:layout_width="90dp"
+                    android:layout_height="14dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_shimmer_pill" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="24dp">
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_shimmer_card" />
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_shimmer_card" />
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:background="@drawable/bg_shimmer_card" />
+                </LinearLayout>
+
+                <!-- Shimmer row 3 -->
+                <View
+                    android:layout_width="140dp"
+                    android:layout_height="14dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_shimmer_pill" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_shimmer_card" />
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_shimmer_card" />
+
+                    <View
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:background="@drawable/bg_shimmer_card" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Dynamic shelves injected here by renderShelves() -->
+            <LinearLayout
+                android:id="@+id/homeShelvesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- Moods & Genres (chips) — populated after get_mood_categories() -->
+            <LinearLayout
+                android:id="@+id/moodsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="20dp"
+                    android:paddingBottom="10dp"
+                    android:text="Moods &amp; Genres"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/moodsRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="20dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ═══════════════════════════════════════════
+         TAB 3: LIBRARY CONTAINER
          ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/libraryContainer"
@@ -375,7 +354,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:background="#020503"
-        android:paddingBottom="56dp"
+        android:paddingBottom="120dp"
         android:visibility="gone">
 
         <RelativeLayout
@@ -575,7 +554,95 @@
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════
-         BOTTOM NAV
+         MINI PLAYER  (above bottom nav, GONE until music plays)
+         layout_marginBottom = 56dp (nav height)
+         ═══════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/miniPlayer"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="56dp"
+        android:orientation="vertical"
+        android:background="#EE121212"
+        android:elevation="16dp"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Thin progress line at top edge -->
+        <View
+            android:id="@+id/miniPlayerProgressLine"
+            android:layout_width="0dp"
+            android:layout_height="2dp"
+            android:background="#00FFA2" />
+
+        <!-- Content row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp">
+
+            <ImageView
+                android:id="@+id/miniArt"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_album_art_default"
+                android:scaleType="centerCrop"
+                android:clipToOutline="true"
+                android:outlineProvider="background"
+                android:contentDescription="Mini album art" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/miniTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="—"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/miniArtist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text=""
+                    android:textColor="#80FFFFFF"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/miniPlayPauseBtn"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_play"
+                android:tint="#FFFFFF"
+                android:contentDescription="Play/Pause" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ═══════════════════════════════════════════
+         BOTTOM NAV  (3 tabs: Search | Home | Library)
          ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/bottomNav"
@@ -587,7 +654,33 @@
         android:elevation="8dp">
 
         <LinearLayout
-            android:id="@+id/navPlayer"
+            android:id="@+id/navSearch"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:alpha="0.4"
+            android:background="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_search"
+                android:tint="#FFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Search"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navHome"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -599,13 +692,13 @@
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_play"
+                android:src="@drawable/ic_home"
                 android:tint="#FFFFFF" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Player"
+                android:text="Home"
                 android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
@@ -641,6 +734,269 @@
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════
+         FULL PLAYER SHEET
+         Slides up from bottom over everything.
+         elevation=32dp — highest in the layout.
+         Initial state: GONE + translationY = screen height (set in code).
+         ═══════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/fullPlayerSheet"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#020503"
+        android:elevation="32dp"
+        android:visibility="gone">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="24dp"
+                android:paddingTop="56dp"
+                android:paddingBottom="32dp">
+
+                <!-- Drag handle -->
+                <View
+                    android:layout_width="40dp"
+                    android:layout_height="4dp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginBottom="20dp"
+                    android:background="#40FFFFFF"
+                    android:outlineProvider="background"
+                    android:clipToOutline="true" />
+
+                <!-- Album art with glow -->
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginBottom="32dp">
+
+                    <View
+                        android:id="@+id/artGlow"
+                        android:layout_width="260dp"
+                        android:layout_height="260dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_glow"
+                        android:alpha="0" />
+
+                    <ImageView
+                        android:id="@+id/albumArt"
+                        android:layout_width="220dp"
+                        android:layout_height="220dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_album_art_default"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:outlineProvider="background"
+                        android:elevation="8dp"
+                        android:contentDescription="Album art" />
+                </FrameLayout>
+
+                <!-- Track info -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="24dp">
+
+                    <TextView
+                        android:id="@+id/trackTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Vibe Check"
+                        android:textColor="#FFFFFF"
+                        android:textSize="22sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="-0.02"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:id="@+id/trackArtist"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Ready to load…"
+                        android:textColor="#80FFFFFF"
+                        android:textSize="13sp"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:gravity="center" />
+                </LinearLayout>
+
+                <!-- Progress area + download button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:id="@+id/currentTime"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="0:00"
+                                android:textColor="#80FFFFFF"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace" />
+
+                            <View
+                                android:layout_width="32dp"
+                                android:layout_height="1dp" />
+
+                            <TextView
+                                android:id="@+id/totalTime"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="0:00"
+                                android:textColor="#80FFFFFF"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:gravity="end" />
+                        </LinearLayout>
+
+                        <ImageButton
+                            android:id="@+id/downloadBtn"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center_vertical|end"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:src="@drawable/ic_download"
+                            android:tint="#00FFA2"
+                            android:visibility="gone"
+                            android:contentDescription="Download current track" />
+                    </FrameLayout>
+
+                    <com.audiofetch.VibeSeekBar
+                        android:id="@+id/seekBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="20dp" />
+                </LinearLayout>
+
+                <!-- Visualizer -->
+                <com.audiofetch.VibeVisualizer
+                    android:id="@+id/visualizer"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:layout_marginBottom="24dp" />
+
+                <!-- Playback controls -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="32dp">
+
+                    <ImageButton
+                        android:id="@+id/playlistBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_playlist"
+                        android:tint="#60FFFFFF"
+                        android:layout_marginEnd="16dp"
+                        android:contentDescription="Queue" />
+
+                    <ImageButton
+                        android:id="@+id/prevBtn"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_skip_prev"
+                        android:tint="#FFFFFF"
+                        android:layout_marginEnd="8dp"
+                        android:contentDescription="Previous" />
+
+                    <FrameLayout
+                        android:id="@+id/playPauseBtn"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:background="@drawable/bg_play_button"
+                        android:layout_marginHorizontal="8dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:id="@+id/playIcon"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_play"
+                            android:tint="#020503"
+                            android:contentDescription="Play" />
+
+                        <ImageView
+                            android:id="@+id/pauseIcon"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_pause"
+                            android:tint="#020503"
+                            android:visibility="gone"
+                            android:contentDescription="Pause" />
+                    </FrameLayout>
+
+                    <ImageButton
+                        android:id="@+id/nextBtn"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_skip_next"
+                        android:tint="#FFFFFF"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="Next" />
+
+                    <ImageButton
+                        android:id="@+id/repeatBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_repeat"
+                        android:tint="#60FFFFFF"
+                        android:layout_marginStart="16dp"
+                        android:contentDescription="Repeat" />
+
+                    <ImageButton
+                        android:id="@+id/lyricsBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_lyrics"
+                        android:tint="#80FFFFFF"
+                        android:alpha="0.5"
+                        android:contentDescription="Lyrics" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </ScrollView>
+
+    </LinearLayout>
+
+    <!-- ═══════════════════════════════════════════
          QUEUE BOTTOM SHEET
          ═══════════════════════════════════════════ -->
     <FrameLayout
@@ -650,7 +1006,7 @@
         android:layout_gravity="bottom"
         android:background="@drawable/bg_bottom_sheet"
         android:translationY="999dp"
-        android:elevation="16dp"
+        android:elevation="36dp"
         android:padding="24dp">
 
         <LinearLayout
@@ -717,6 +1073,75 @@
     </FrameLayout>
 
     <!-- ═══════════════════════════════════════════
+         SEARCH RESULTS BOTTOM SHEET
+         ═══════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/searchSheet"
+        android:layout_width="match_parent"
+        android:layout_height="520dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_bottom_sheet"
+        android:translationY="999dp"
+        android:elevation="36dp"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/searchSheetTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Results"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05" />
+
+                <ImageButton
+                    android:id="@+id/closeSearchSheetBtn"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_close"
+                    android:tint="#80FFFFFF"
+                    android:contentDescription="Close" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/searchSheetProgress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_horizontal"
+                android:indeterminate="true"
+                android:indeterminateTint="#00FFA2"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/searchResultsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp" />
+
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ═══════════════════════════════════════════
          SETTINGS SIDE PANEL
          ═══════════════════════════════════════════ -->
     <FrameLayout
@@ -726,7 +1151,7 @@
         android:layout_gravity="end"
         android:background="@drawable/bg_settings_panel"
         android:translationX="300dp"
-        android:elevation="24dp"
+        android:elevation="40dp"
         android:padding="24dp">
 
         <ScrollView
@@ -844,7 +1269,9 @@
         </ScrollView>
     </FrameLayout>
 
-    <!-- Scrim -->
+    <!-- ═══════════════════════════════════════════
+         SCRIM  (shared by all overlays)
+         ═══════════════════════════════════════════ -->
     <View
         android:id="@+id/scrim"
         android:layout_width="match_parent"
@@ -853,139 +1280,72 @@
         android:alpha="0"
         android:visibility="gone"
         android:clickable="true"
-        android:focusable="true" />
+        android:focusable="true"
+        android:elevation="34dp" />
+
     <!-- ═══════════════════════════════════════════
-         SEARCH RESULTS BOTTOM SHEET
+         LYRICS SHEET  (full-screen overlay, above scrim)
          ═══════════════════════════════════════════ -->
-    <FrameLayout
-        android:id="@+id/searchSheet"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/lyricsSheet"
         android:layout_width="match_parent"
-        android:layout_height="520dp"
-        android:layout_gravity="bottom"
-        android:background="@drawable/bg_bottom_sheet"
-        android:translationY="999dp"
-        android:elevation="16dp"
-        android:padding="24dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <!-- Header -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
-
-                <TextView
-                    android:id="@+id/searchSheetTitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Results"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="0.05" />
-
-                <ImageButton
-                    android:id="@+id/closeSearchSheetBtn"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_close"
-                    android:tint="#80FFFFFF"
-                    android:contentDescription="Close" />
-            </LinearLayout>
-
-            <!-- Loading indicator shown while fetching -->
-            <ProgressBar
-                android:id="@+id/searchSheetProgress"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="center_horizontal"
-                android:indeterminate="true"
-                android:indeterminateTint="#00FFA2"
-                android:visibility="gone"
-                android:layout_marginBottom="8dp" />
-
-            <!-- Results list -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/searchResultsRecycler"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:scrollbars="none"
-                android:overScrollMode="never"
-                android:clipToPadding="false"
-                android:paddingBottom="8dp" />
-
-        </LinearLayout>
-    </FrameLayout>
-   <androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/lyricsSheet"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#FF0A0A0A"
-    android:visibility="gone"
-    android:elevation="12dp">
-
-    <ImageButton
-        android:id="@+id/lyricsBackBtn"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="16dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@drawable/ic_arrow_back"
-        android:tint="#99FFFFFF"
-        android:contentDescription="Close lyrics"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <TextView
-        android:id="@+id/lyricsTitleText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="64dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="#80FFFFFF"
-        android:textSize="13sp"
-        app:layout_constraintBottom_toBottomOf="@id/lyricsBackBtn"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/lyricsBackBtn"
-        app:layout_constraintTop_toTopOf="@id/lyricsBackBtn" />
-
-    <ProgressBar
-        android:id="@+id/lyricsLoadingIndicator"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_height="match_parent"
+        android:background="#FF0A0A0A"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:elevation="44dp">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/lyricsRecycler"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:paddingTop="80dp"
-        android:paddingBottom="120dp"
-        android:clipToPadding="false"
-        android:overScrollMode="never"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/lyricsBackBtn" />
+        <ImageButton
+            android:id="@+id/lyricsBackBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="16dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            android:tint="#99FFFFFF"
+            android:contentDescription="Close lyrics"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <TextView
+            android:id="@+id/lyricsTitleText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="64dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#80FFFFFF"
+            android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="@id/lyricsBackBtn"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/lyricsBackBtn"
+            app:layout_constraintTop_toTopOf="@id/lyricsBackBtn" />
+
+        <ProgressBar
+            android:id="@+id/lyricsLoadingIndicator"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/lyricsRecycler"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:paddingTop="80dp"
+            android:paddingBottom="120dp"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/lyricsBackBtn" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
