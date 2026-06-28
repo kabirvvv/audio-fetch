@@ -23,7 +23,9 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.view.ViewGroup
 import android.widget.*
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -37,6 +39,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.audiofetch.databinding.ActivityMainBinding
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
@@ -538,19 +541,20 @@ class MainActivity : AppCompatActivity() {
                 if (items.isNotEmpty()) result.add(HomeShelf("Quick Picks", items))
             }
 
-            // Trending / editorial shelves
-            val shelves = root.optJSONArray("shelves")
-            if (shelves != null) {
-                for (i in 0 until shelves.length()) {
-                    val shelf = shelves.getJSONObject(i)
-                    val title = shelf.optString("shelfTitle", "").ifEmpty { continue }
-                    val itemsArr = shelf.optJSONArray("items") ?: continue
-                    val items = (0 until itemsArr.length()).mapNotNull { j ->
-                        parseHomeCard(itemsArr.getJSONObject(j))
-                    }
-                    if (items.isNotEmpty()) result.add(HomeShelf(title, items))
-                }
-            }
+          // Trending / editorial shelves
+val shelves = root.optJSONArray("shelves")
+if (shelves != null) {
+    for (i in 0 until shelves.length()) {
+        val shelf = shelves.getJSONObject(i)
+        val title = shelf.optString("shelfTitle", "").ifEmpty { "" }
+        if (title.isEmpty()) continue
+        val itemsArr = shelf.optJSONArray("items") ?: continue
+        val items = (0 until itemsArr.length()).mapNotNull { j ->
+            parseHomeCard(itemsArr.getJSONObject(j))
+        }
+        if (items.isNotEmpty()) result.add(HomeShelf(title, items))
+    }
+}
 
             result
         } catch (_: Exception) { emptyList() }
