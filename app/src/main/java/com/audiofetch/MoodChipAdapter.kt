@@ -1,4 +1,4 @@
-package com.example.audiofetch
+package com.audiofetch
 
 import android.view.LayoutInflater
 import android.view.View
@@ -7,7 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.example.audiofetch.R
+import com.audiofetch.R
 
 class MoodChipAdapter(
     private val onClick: (params: String, title: String) -> Unit,
