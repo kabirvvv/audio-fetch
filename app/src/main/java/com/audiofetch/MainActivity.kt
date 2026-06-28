@@ -18,6 +18,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.EditorInfo
@@ -52,20 +53,29 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
-    private var autoplayEnabled = false
+    // ── Tab state ─────────────────────────────────────────────────────────────
+    enum class Tab { SEARCH, HOME, LIBRARY }
+    private var currentTab = Tab.HOME
 
+    // ── Home data ─────────────────────────────────────────────────────────────
+    private var homeDataCache: List<HomeShelf> = emptyList()
+    private var homeCacheTime: Long = 0L
+
+    // ── Full player state ─────────────────────────────────────────────────────
+    private var fullPlayerVisible = false
+
+    // ── Playback ──────────────────────────────────────────────────────────────
+    private var autoplayEnabled = false
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var player: MediaController? = null
     private var androidVisualizer: Visualizer? = null
     private var equalizer: Equalizer? = null
-
     private val tracks = mutableListOf<Track>()
     private var currentIndex = -1
     private var repeatMode = Player.REPEAT_MODE_OFF
     private var currentTheme = VibeThemes.all[0]
     private var sleepTimerHandler: Handler? = null
     private var sleepTimerRunnable: Runnable? = null
-
     private var currentStreamWebpageUrl: String? = null
     private var currentStreamTitle: String? = null
 
@@ -79,7 +89,6 @@ class MainActivity : AppCompatActivity() {
     private val uiRunnable = object : Runnable {
         override fun run() {
             updateProgressUI()
-            // Synced lyrics highlight
             if (lyricsVisible && syncedLines.isNotEmpty()) {
                 val pos = player?.currentPosition ?: 0L
                 val idx = syncedLines.indexOfLast { it.timeMs <= pos }
@@ -101,8 +110,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var libraryAdapter: LibraryAdapter
     private lateinit var playlistsAdapter: PlaylistsAdapter
     private lateinit var searchResultsAdapter: SearchResultsAdapter
-
     private var openPlaylist: Playlist? = null
+
+    // ─────────────────────────────────────────────
+    // LIFECYCLE
+    // ─────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,6 +141,33 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(
                 this, arrayOf(Manifest.permission.READ_MEDIA_AUDIO), 1002
             )
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (player?.isPlaying == true) uiHandler.post(uiRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        uiHandler.removeCallbacks(uiRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        uiHandler.removeCallbacks(uiRunnable)
+        stopVisualizer()
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onBackPressed() {
+        when {
+            fullPlayerVisible -> hideFullPlayer()
+            lyricsVisible     -> hideLyrics()
+            else              -> super.onBackPressed()
         }
     }
 
@@ -171,7 +210,6 @@ class MainActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = libraryAdapter
         }
-
         playlistsAdapter = PlaylistsAdapter(emptyList(), ::openPlaylist, ::onPlaylistLongPress)
         binding.playlistsRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
@@ -195,29 +233,46 @@ class MainActivity : AppCompatActivity() {
         binding.libTabHistory.setOnClickListener   { selectLibraryTab(2) }
         binding.newPlaylistBtn.setOnClickListener  { promptCreatePlaylist() }
         binding.backFromPlaylistBtn.setOnClickListener { closeOpenPlaylist() }
+        binding.libraryCloseBtn.setOnClickListener { switchTab(Tab.HOME) }
 
         // ── Bottom nav ────────────────────────────────────────────────────────
-        binding.navPlayer.setOnClickListener  { showPlayerTab() }
-        binding.navLibrary.setOnClickListener { showLibraryTab() }
+        binding.navSearch.setOnClickListener  { switchTab(Tab.SEARCH) }
+        binding.navHome.setOnClickListener    { switchTab(Tab.HOME) }
+        binding.navLibrary.setOnClickListener { switchTab(Tab.LIBRARY) }
+
+        // ── Mini player ───────────────────────────────────────────────────────
+        binding.miniPlayer.setOnClickListener { showFullPlayer() }
+        // miniPlayPauseBtn must not bubble up to miniPlayer's click
+        binding.miniPlayPauseBtn.setOnClickListener { togglePlayPause() }
+
+        // ── Full player swipe-down to dismiss ─────────────────────────────────
+        var touchStartY = 0f
+        binding.fullPlayerSheet.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> { touchStartY = event.rawY; false }
+                MotionEvent.ACTION_UP   -> {
+                    if (event.rawY - touchStartY > resources.displayMetrics.density * 100) {
+                        hideFullPlayer(); true
+                    } else false
+                }
+                else -> false
+            }
+        }
 
         // ── Player controls ───────────────────────────────────────────────────
         binding.fetchBtn.setOnClickListener { startStream() }
         binding.urlInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) { startStream(); true } else false
         }
-
         binding.downloadBtn.isVisible = false
         binding.downloadBtn.setOnClickListener { downloadCurrentStream() }
-
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
         binding.nextBtn.setOnClickListener { playNext() }
         binding.prevBtn.setOnClickListener { playPrev() }
         binding.repeatBtn.setOnClickListener { cycleRepeat() }
-
         binding.seekBar.onSeek = { fraction ->
             player?.let { p -> p.seekTo((fraction * p.duration).toLong()) }
         }
-
         binding.playlistBtn.setOnClickListener { showQueueSheet() }
         binding.closePlaylistBtn.setOnClickListener { hideQueueSheet() }
 
@@ -241,10 +296,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.clearQueueBtn.setOnClickListener { clearQueue() }
-
         binding.menuBtn.setOnClickListener { showSettings() }
         binding.closeSettingsBtn.setOnClickListener { hideSettings() }
-        binding.libraryCloseBtn.setOnClickListener { showPlayerTab() }
 
         binding.scrim.setOnClickListener {
             hideQueueSheet()
@@ -260,8 +313,6 @@ class MainActivity : AppCompatActivity() {
         }
         binding.lyricsBackBtn.setOnClickListener { hideLyrics() }
         binding.lyricsBtn.setOnClickListener { showLyrics() }
-
-        // Start lyrics sheet off-screen so it can animate up
         binding.lyricsSheet.post {
             binding.lyricsSheet.translationY = binding.lyricsSheet.height.toFloat()
         }
@@ -270,26 +321,121 @@ class MainActivity : AppCompatActivity() {
         setupTimerChips()
         setupThemeGrid()
         selectLibraryTab(0)
+
+        // Start on Home tab
+        switchTab(Tab.HOME)
     }
 
     // ─────────────────────────────────────────────
-    // BOTTOM NAV
+    // BOTTOM NAV / TAB SWITCHING
     // ─────────────────────────────────────────────
 
-    private fun showPlayerTab() {
-        binding.playerContainer.visibility = View.VISIBLE
-        binding.libraryContainer.visibility = View.GONE
-        binding.navPlayer.alpha = 1f
-        binding.navLibrary.alpha = 0.4f
+    private fun switchTab(tab: Tab) {
+        currentTab = tab
+        binding.searchContainer.isVisible  = tab == Tab.SEARCH
+        binding.homeContainer.isVisible    = tab == Tab.HOME
+        binding.libraryContainer.isVisible = tab == Tab.LIBRARY
+        binding.navSearch.alpha  = if (tab == Tab.SEARCH)  1f else 0.4f
+        binding.navHome.alpha    = if (tab == Tab.HOME)    1f else 0.4f
+        binding.navLibrary.alpha = if (tab == Tab.LIBRARY) 1f else 0.4f
+        if (tab == Tab.LIBRARY) {
+            refreshLibraryTab()
+            refreshPlaylists()
+        }
+        if (tab == Tab.HOME) {
+            val stale = System.currentTimeMillis() - homeCacheTime > 30 * 60 * 1000L
+            if (homeDataCache.isEmpty() || stale) loadHomeData()
+            else renderShelves(homeDataCache)
+        }
     }
 
-    private fun showLibraryTab() {
-        binding.playerContainer.visibility = View.GONE
-        binding.libraryContainer.visibility = View.VISIBLE
-        binding.navPlayer.alpha = 0.4f
-        binding.navLibrary.alpha = 1f
-        refreshLibraryTab()
-        refreshPlaylists()
+    // ─────────────────────────────────────────────
+    // MINI PLAYER
+    // ─────────────────────────────────────────────
+
+    private fun showMiniPlayer() {
+        binding.miniPlayer.visibility = View.VISIBLE
+    }
+
+    private fun hideMiniPlayer() {
+        binding.miniPlayer.visibility = View.GONE
+    }
+
+    private fun updateMiniPlayer(track: Track) {
+        binding.miniTitle.text  = track.title
+        binding.miniArtist.text = track.artist.ifEmpty { "AudioFetch" }
+        if (track.thumbnailUrl.isNotEmpty()) {
+            try {
+                com.bumptech.glide.Glide.with(this)
+                    .load(track.thumbnailUrl)
+                    .placeholder(R.drawable.bg_album_art_default)
+                    .error(R.drawable.bg_album_art_default)
+                    .centerCrop()
+                    .into(binding.miniArt)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun updateMiniProgressLine(fraction: Float) {
+        binding.miniPlayerProgressLine.post {
+            val totalWidth = binding.miniPlayer.width
+            val lp = binding.miniPlayerProgressLine.layoutParams
+            lp.width = (totalWidth * fraction.coerceIn(0f, 1f)).toInt()
+            binding.miniPlayerProgressLine.layoutParams = lp
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // FULL PLAYER SHEET
+    // ─────────────────────────────────────────────
+
+    private fun showFullPlayer() {
+        if (fullPlayerVisible) return
+        fullPlayerVisible = true
+        binding.fullPlayerSheet.visibility = View.VISIBLE
+        binding.fullPlayerSheet.translationY = binding.rootLayout.height.toFloat()
+        binding.fullPlayerSheet.animate()
+            .translationY(0f)
+            .setDuration(400)
+            .setInterpolator(DecelerateInterpolator(2f))
+            .start()
+    }
+
+    private fun hideFullPlayer() {
+        if (!fullPlayerVisible) return
+        fullPlayerVisible = false
+        binding.fullPlayerSheet.animate()
+            .translationY(binding.rootLayout.height.toFloat())
+            .setDuration(300)
+            .withEndAction { binding.fullPlayerSheet.visibility = View.GONE }
+            .start()
+    }
+
+    // ─────────────────────────────────────────────
+    // HOME DATA
+    // ─────────────────────────────────────────────
+
+    private fun loadHomeData() {
+        showShimmer()
+        val history = LibraryManager.getHistory().takeLast(10).reversed()
+        binding.recentlyPlayedSection.isVisible = history.isNotEmpty()
+        // TODO: wire recentlyPlayedRecycler with a HomeCardAdapter when ready
+        // Online shelves loaded here in a future session
+        hideShimmer()
+        homeCacheTime = System.currentTimeMillis()
+    }
+
+    private fun renderShelves(shelves: List<HomeShelf>) {
+        homeDataCache = shelves
+        // TODO: dynamically inflate shelf rows into binding.homeShelvesContainer
+    }
+
+    private fun showShimmer() {
+        binding.homeShimmerContainer.isVisible = true
+    }
+
+    private fun hideShimmer() {
+        binding.homeShimmerContainer.isVisible = false
     }
 
     // ─────────────────────────────────────────────
@@ -310,8 +456,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshLibraryTab() {
         val list = when (currentLibTab) {
-            0 -> LibraryManager.getDownloads()
-            1 -> LibraryManager.getLocal()
+            0    -> LibraryManager.getDownloads()
+            1    -> LibraryManager.getLocal()
             else -> LibraryManager.getHistory()
         }
         libraryAdapter.update(list)
@@ -353,7 +499,8 @@ class MainActivity : AppCompatActivity() {
         }
         val idx = tracks.indexOfFirst { it.uri == track.uri }
         loadTrack(idx)
-        showPlayerTab()
+        showMiniPlayer()
+        showFullPlayer()
     }
 
     private fun onLibraryTrackLongPress(track: Track, _anchor: View) {
@@ -366,18 +513,18 @@ class MainActivity : AppCompatActivity() {
             .setTitle(track.title)
             .setItems(options.toTypedArray()) { _, which ->
                 when (options[which]) {
-                    "Add to Queue" -> addToQueue(track)
-                    "Add to Playlist" -> promptAddToPlaylist(track)
-                    "Remove from Downloads" -> {
+                    "Add to Queue"            -> addToQueue(track)
+                    "Add to Playlist"         -> promptAddToPlaylist(track)
+                    "Remove from Downloads"   -> {
                         LibraryManager.removeDownload(this, track)
                         refreshLibraryTab()
                     }
-                    "Remove from Local" -> {
+                    "Remove from Local"       -> {
                         val updated = LibraryManager.getLocal().filter { it.uri != track.uri }
                         LibraryManager.setLocal(this, updated)
                         refreshLibraryTab()
                     }
-                    "Remove from Playlist" -> {
+                    "Remove from Playlist"    -> {
                         openPlaylist?.let { pl ->
                             LibraryManager.removeTrackFromPlaylist(this, pl.id, track.uri.toString())
                             openPlaylist(pl)
@@ -477,10 +624,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun onQueueReordered(from: Int, to: Int) {
         currentIndex = when {
-            from == currentIndex -> to
-            from < currentIndex && to >= currentIndex -> currentIndex - 1
-            from > currentIndex && to <= currentIndex -> currentIndex + 1
-            else -> currentIndex
+            from == currentIndex                          -> to
+            from < currentIndex && to >= currentIndex    -> currentIndex - 1
+            from > currentIndex && to <= currentIndex    -> currentIndex + 1
+            else                                         -> currentIndex
         }
         player?.moveMediaItem(from, to)
     }
@@ -568,7 +715,6 @@ class MainActivity : AppCompatActivity() {
                 syncedLines = lines
                 currentLyricLine = -1
                 lyricsAdapter.update(lines.map { it.text })
-                // Scroll to current playback position immediately
                 val pos = player?.currentPosition ?: 0L
                 val idx = lines.indexOfLast { it.timeMs <= pos }
                 if (idx >= 0) {
@@ -637,11 +783,16 @@ class MainActivity : AppCompatActivity() {
         })
 
         val presets = listOf("Flat", "Bass", "Pop", "Chill")
-        val presetValues = mapOf("Flat" to Triple(12,12,12), "Bass" to Triple(20,14,10), "Pop" to Triple(14,16,18), "Chill" to Triple(16,10,14))
+        val presetValues = mapOf(
+            "Flat"  to Triple(12, 12, 12),
+            "Bass"  to Triple(20, 14, 10),
+            "Pop"   to Triple(14, 16, 18),
+            "Chill" to Triple(16, 10, 14)
+        )
         presets.forEach { name ->
             val chip = buildChip(name, isActive = name == "Flat")
             chip.setOnClickListener {
-                val (l, m, h) = presetValues[name] ?: Triple(12,12,12)
+                val (l, m, h) = presetValues[name] ?: Triple(12, 12, 12)
                 binding.eqLow.progress = l; binding.eqMid.progress = m; binding.eqHigh.progress = h
                 updateChipSelection(binding.eqPresets, chip); applyEQ()
             }
@@ -662,7 +813,7 @@ class MainActivity : AppCompatActivity() {
         VibeThemes.all.forEach { theme ->
             val dot = View(this).apply {
                 val size = (48 * resources.displayMetrics.density).toInt()
-                layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(6,6,6,6) }
+                layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(6, 6, 6, 6) }
                 val gd = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(theme.bgColor, theme.accentColor))
                 gd.cornerRadius = size / 2f
                 background = gd
@@ -682,13 +833,24 @@ class MainActivity : AppCompatActivity() {
     private fun buildChip(label: String, isActive: Boolean): TextView {
         return TextView(this).apply {
             text = label; textSize = 11f
-            setPadding((12*resources.displayMetrics.density).toInt(),(6*resources.displayMetrics.density).toInt(),(12*resources.displayMetrics.density).toInt(),(6*resources.displayMetrics.density).toInt())
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,(8*resources.displayMetrics.density).toInt(),0) }
-            setTextColor(if (isActive) currentTheme.accentColor else Color.argb(128,255,255,255))
+            setPadding(
+                (12 * resources.displayMetrics.density).toInt(),
+                (6  * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt(),
+                (6  * resources.displayMetrics.density).toInt()
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, (8 * resources.displayMetrics.density).toInt(), 0) }
+            setTextColor(if (isActive) currentTheme.accentColor else Color.argb(128, 255, 255, 255))
             val gd = GradientDrawable()
             gd.cornerRadius = 24f * resources.displayMetrics.density
-            gd.setStroke(1, if (isActive) currentTheme.accentColor else Color.argb(40,255,255,255))
-            gd.setColor(if (isActive) Color.argb(30, Color.red(currentTheme.accentColor), Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor)) else Color.TRANSPARENT)
+            gd.setStroke(1, if (isActive) currentTheme.accentColor else Color.argb(40, 255, 255, 255))
+            gd.setColor(
+                if (isActive) Color.argb(30, Color.red(currentTheme.accentColor), Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor))
+                else Color.TRANSPARENT
+            )
             background = gd; isClickable = true; isFocusable = true
         }
     }
@@ -697,10 +859,13 @@ class MainActivity : AppCompatActivity() {
         for (i in 0 until container.childCount) {
             val chip = container.getChildAt(i) as? TextView ?: continue
             val isSelected = chip == selected
-            chip.setTextColor(if (isSelected) currentTheme.accentColor else Color.argb(128,255,255,255))
+            chip.setTextColor(if (isSelected) currentTheme.accentColor else Color.argb(128, 255, 255, 255))
             val gd = chip.background as? GradientDrawable ?: continue
-            gd.setStroke(1, if (isSelected) currentTheme.accentColor else Color.argb(40,255,255,255))
-            gd.setColor(if (isSelected) Color.argb(30, Color.red(currentTheme.accentColor), Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor)) else Color.TRANSPARENT)
+            gd.setStroke(1, if (isSelected) currentTheme.accentColor else Color.argb(40, 255, 255, 255))
+            gd.setColor(
+                if (isSelected) Color.argb(30, Color.red(currentTheme.accentColor), Color.green(currentTheme.accentColor), Color.blue(currentTheme.accentColor))
+                else Color.TRANSPARENT
+            )
         }
     }
 
@@ -740,7 +905,7 @@ class MainActivity : AppCompatActivity() {
         binding.playPauseBtn.background = playBg
         listOf(binding.eqLow, binding.eqMid, binding.eqHigh).forEach {
             it.progressTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
-            it.thumbTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
+            it.thumbTintList    = android.content.res.ColorStateList.valueOf(theme.accentColor)
         }
         listOf(binding.eqLowVal, binding.eqMidVal, binding.eqHighVal).forEach { it.setTextColor(theme.accentColor) }
         trackAdapter.accentColor = theme.accentColor
@@ -753,9 +918,9 @@ class MainActivity : AppCompatActivity() {
     private fun blendColors(c1: Int, c2: Int, ratio: Float): Int {
         val inv = 1f - ratio
         return Color.rgb(
-            (Color.red(c1)*inv + Color.red(c2)*ratio).toInt(),
-            (Color.green(c1)*inv + Color.green(c2)*ratio).toInt(),
-            (Color.blue(c1)*inv + Color.blue(c2)*ratio).toInt()
+            (Color.red(c1)   * inv + Color.red(c2)   * ratio).toInt(),
+            (Color.green(c1) * inv + Color.green(c2) * ratio).toInt(),
+            (Color.blue(c1)  * inv + Color.blue(c2)  * ratio).toInt()
         )
     }
 
@@ -777,7 +942,7 @@ class MainActivity : AppCompatActivity() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 updatePlayPauseIcon(isPlaying)
                 if (isPlaying) { uiHandler.post(uiRunnable); animateAlbumArt(true); startVisualizer() }
-                else { uiHandler.removeCallbacks(uiRunnable); animateAlbumArt(false) }
+                else           { uiHandler.removeCallbacks(uiRunnable); animateAlbumArt(false) }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -787,11 +952,9 @@ class MainActivity : AppCompatActivity() {
                     setTrackInfo(tracks[idx])
                     trackAdapter.setNowPlaying(idx)
                     LibraryManager.addToHistory(this@MainActivity, tracks[idx])
-                    // Auto-dismiss lyrics and reset sync state on track change
                     if (lyricsVisible) hideLyrics()
                     syncedLines = emptyList()
                     currentLyricLine = -1
-                    // Fetch more autoplay tracks when approaching the end of the queue
                     if (autoplayEnabled && idx >= tracks.size - 2) {
                         fetchAndAppendAutoplay(tracks[idx].videoId)
                     }
@@ -855,7 +1018,11 @@ class MainActivity : AppCompatActivity() {
         if (fft.isEmpty()) return
         val energy = fft.take(20).sumOf { (it.toInt() and 0xFF) } / 20f / 255f
         val targetAlpha = (0.3f + energy * 0.7f).coerceIn(0f, 1f)
-        binding.artGlow.animate().alpha(targetAlpha).scaleX(1.1f + energy * 0.15f).scaleY(1.1f + energy * 0.15f).setDuration(80).start()
+        binding.artGlow.animate()
+            .alpha(targetAlpha)
+            .scaleX(1.1f + energy * 0.15f)
+            .scaleY(1.1f + energy * 0.15f)
+            .setDuration(80).start()
     }
 
     // ─────────────────────────────────────────────
@@ -902,11 +1069,14 @@ class MainActivity : AppCompatActivity() {
         repeatMode = when (repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_OFF
+            else                   -> Player.REPEAT_MODE_OFF
         }
         player?.repeatMode = repeatMode
         binding.repeatBtn.alpha = if (repeatMode == Player.REPEAT_MODE_OFF) 0.4f else 1f
-        binding.repeatBtn.setColorFilter(if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor else Color.argb(153,255,255,255))
+        binding.repeatBtn.setColorFilter(
+            if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
+            else Color.argb(153, 255, 255, 255)
+        )
     }
 
     private fun clearQueue() {
@@ -915,13 +1085,15 @@ class MainActivity : AppCompatActivity() {
         player?.clearMediaItems(); player?.stop()
         stopVisualizer()
         trackAdapter.updateTracks(emptyList())
-        binding.trackTitle.text = "Vibe Check"
+        binding.trackTitle.text  = "Vibe Check"
         binding.trackArtist.text = "Queue cleared"
         currentStreamWebpageUrl = null
         currentStreamTitle = null
         binding.downloadBtn.isVisible = false
-        updatePlayPauseIcon(false); animateAlbumArt(false)
-        // Reset lyrics state on queue clear
+        updatePlayPauseIcon(false)
+        animateAlbumArt(false)
+        hideMiniPlayer()
+        hideFullPlayer()
         if (lyricsVisible) hideLyrics()
         syncedLines = emptyList()
         currentLyricLine = -1
@@ -932,7 +1104,8 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun setTrackInfo(track: Track) {
-        binding.trackTitle.text = track.title
+        // Full player
+        binding.trackTitle.text  = track.title
         binding.trackArtist.text = track.artist.ifEmpty { "AudioFetch" }
         if (track.thumbnailUrl.isNotEmpty()) {
             val currentTag = binding.albumArt.tag as? String
@@ -953,6 +1126,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             loadAlbumArt(track.uri)
         }
+        // Mini player sync
+        updateMiniPlayer(track)
     }
 
     private fun loadAlbumArt(uri: Uri) {
@@ -976,9 +1151,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun tryLoadAlbumArt(uri: Uri): android.graphics.Bitmap? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                return contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
-            } catch (_: Exception) {}
+            try { return contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null) }
+            catch (_: Exception) {}
         }
         try {
             android.media.MediaMetadataRetriever().use { mmr ->
@@ -1001,27 +1175,35 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePlayPauseIcon(playing: Boolean) {
-        binding.playIcon.visibility = if (playing) View.GONE else View.VISIBLE
+        binding.playIcon.visibility  = if (playing) View.GONE else View.VISIBLE
         binding.pauseIcon.visibility = if (playing) View.VISIBLE else View.GONE
+        binding.miniPlayPauseBtn.setImageResource(
+            if (playing) R.drawable.ic_pause else R.drawable.ic_play
+        )
     }
 
     private fun updateProgressUI() {
         val p = player ?: return
         val duration = p.duration.takeIf { it > 0 } ?: return
         val pos = p.currentPosition
-        binding.seekBar.progress = pos.toFloat() / duration.toFloat()
+        val fraction = pos.toFloat() / duration.toFloat()
+        binding.seekBar.progress = fraction
         binding.currentTime.text = formatTime(pos)
-        binding.totalTime.text = formatTime(duration)
+        binding.totalTime.text   = formatTime(duration)
+        updateMiniProgressLine(fraction)
     }
 
     private fun animateAlbumArt(playing: Boolean) {
-        binding.albumArt.animate().scaleX(if (playing) 1.04f else 1f).scaleY(if (playing) 1.04f else 1f).setDuration(400).setInterpolator(DecelerateInterpolator()).start()
+        binding.albumArt.animate()
+            .scaleX(if (playing) 1.04f else 1f)
+            .scaleY(if (playing) 1.04f else 1f)
+            .setDuration(400).setInterpolator(DecelerateInterpolator()).start()
         if (!playing) binding.artGlow.animate().alpha(0f).setDuration(600).start()
     }
 
     private fun formatTime(ms: Long): String {
         val s = ms / 1000; val m = s / 60; val sec = s % 60
-        return "$m:${sec.toString().padStart(2,'0')}"
+        return "$m:${sec.toString().padStart(2, '0')}"
     }
 
     // ─────────────────────────────────────────────
@@ -1032,12 +1214,16 @@ class MainActivity : AppCompatActivity() {
         binding.scrim.visibility = View.VISIBLE
         binding.settingsPanel.visibility = View.VISIBLE
         binding.scrim.animate().alpha(0.6f).setDuration(300).start()
-        binding.settingsPanel.animate().translationX(0f).setDuration(400).setInterpolator(DecelerateInterpolator(2f)).start()
+        binding.settingsPanel.animate().translationX(0f).setDuration(400)
+            .setInterpolator(DecelerateInterpolator(2f)).start()
     }
 
     private fun hideSettings() {
-        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction { binding.scrim.visibility = View.GONE }.start()
-        binding.settingsPanel.animate().translationX(binding.settingsPanel.width.toFloat()).setDuration(300).withEndAction { binding.settingsPanel.visibility = View.GONE }.start()
+        binding.scrim.animate().alpha(0f).setDuration(200)
+            .withEndAction { binding.scrim.visibility = View.GONE }.start()
+        binding.settingsPanel.animate()
+            .translationX(binding.settingsPanel.width.toFloat()).setDuration(300)
+            .withEndAction { binding.settingsPanel.visibility = View.GONE }.start()
     }
 
     // ─────────────────────────────────────────────
@@ -1195,21 +1381,18 @@ class MainActivity : AppCompatActivity() {
         val parsedVideoId = Uri.parse(webpageUrl).getQueryParameter("v")
 
         val streamTrack = Track(
-            uri = Uri.parse(streamUrl),
-            title = title,
-            artist = artist,
-            videoId = parsedVideoId,
+            uri          = Uri.parse(streamUrl),
+            title        = title,
+            artist       = artist,
+            videoId      = parsedVideoId,
             thumbnailUrl = thumbnail
         )
 
         val existingIdx = tracks.indexOfFirst {
             (it.videoId != null && it.videoId == parsedVideoId) || it.uri == streamTrack.uri
         }
-        if (existingIdx >= 0) {
-            tracks[existingIdx] = streamTrack
-        } else {
-            tracks.add(streamTrack)
-        }
+        if (existingIdx >= 0) tracks[existingIdx] = streamTrack
+        else                  tracks.add(streamTrack)
 
         currentIndex = tracks.indexOfFirst { it.uri == streamTrack.uri }
         trackAdapter.updateTracks(tracks)
@@ -1247,7 +1430,7 @@ class MainActivity : AppCompatActivity() {
             p.clearMediaItems()
             tracks.forEachIndexed { i, t ->
                 if (i == currentIndex) p.addMediaItem(mediaItem)
-                else p.addMediaItem(MediaItem.fromUri(t.uri))
+                else                   p.addMediaItem(MediaItem.fromUri(t.uri))
             }
             p.seekTo(currentIndex, 0); p.prepare(); p.play()
         }
@@ -1255,7 +1438,11 @@ class MainActivity : AppCompatActivity() {
         binding.downloadBtn.isVisible = true
         setStatus("streaming: $title", StatusType.SUCCESS)
 
-        // Kick off autoplay fetch in background if enabled
+        // Show mini player and bring up full player
+        updateMiniPlayer(streamTrack)
+        showMiniPlayer()
+        showFullPlayer()
+
         if (autoplayEnabled && parsedVideoId != null) {
             fetchAndAppendAutoplay(parsedVideoId)
         }
@@ -1293,12 +1480,12 @@ class MainActivity : AppCompatActivity() {
 
                     val json = JSONObject(streamJson)
                     val track = Track(
-                        uri        = Uri.parse(json.getString("url")),
-                        title      = json.optString("title", obj.optString("title", "Unknown")),
-                        artist     = json.optString("artist", obj.optString("artist", "")),
-                        durationMs = json.optLong("durationSeconds", 0) * 1000L,
-                        videoId    = vid,
-                        isAutoplay = true,
+                        uri          = Uri.parse(json.getString("url")),
+                        title        = json.optString("title",  obj.optString("title",  "Unknown")),
+                        artist       = json.optString("artist", obj.optString("artist", "")),
+                        durationMs   = json.optLong("durationSeconds", 0) * 1000L,
+                        videoId      = vid,
+                        isAutoplay   = true,
                         thumbnailUrl = json.optString("thumbnail", "")
                     )
                     tracks.add(track)
@@ -1310,7 +1497,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
-    // DOWNLOAD CURRENT STREAM
+    // DOWNLOAD
     // ─────────────────────────────────────────────
 
     private fun downloadCurrentStream() {
@@ -1334,7 +1521,7 @@ class MainActivity : AppCompatActivity() {
             val uri = saveToDownloads(result)
             if (uri != null) {
                 val file = File(result)
-                val savedTitle = file.nameWithoutExtension.replace('_',' ').replace('-',' ').trim()
+                val savedTitle = file.nameWithoutExtension.replace('_', ' ').replace('-', ' ').trim()
                 val newTrack = Track(uri = uri, title = savedTitle)
                 LibraryManager.addDownload(this@MainActivity, newTrack)
                 binding.downloadBtn.isVisible = false
@@ -1350,7 +1537,11 @@ class MainActivity : AppCompatActivity() {
         val src = File(srcPath)
         if (!src.exists()) return null
         val mimeType = when (src.extension.lowercase()) {
-            "mp3" -> "audio/mpeg"; "m4a" -> "audio/mp4"; "opus" -> "audio/opus"; "webm" -> "audio/webm"; else -> "audio/*"
+            "mp3"  -> "audio/mpeg"
+            "m4a"  -> "audio/mp4"
+            "opus" -> "audio/opus"
+            "webm" -> "audio/webm"
+            else   -> "audio/*"
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
@@ -1403,27 +1594,5 @@ class MainActivity : AppCompatActivity() {
             StatusType.SUCCESS -> R.color.status_success
             StatusType.NEUTRAL -> R.color.status_muted
         }))
-    }
-
-    // ─────────────────────────────────────────────
-    // LIFECYCLE
-    // ─────────────────────────────────────────────
-
-    override fun onResume() {
-        super.onResume()
-        if (player?.isPlaying == true) uiHandler.post(uiRunnable)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        uiHandler.removeCallbacks(uiRunnable)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        uiHandler.removeCallbacks(uiRunnable)
-        stopVisualizer()
-        controllerFuture?.let { MediaController.releaseFuture(it) }
-        sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
     }
 }
