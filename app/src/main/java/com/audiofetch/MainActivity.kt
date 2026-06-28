@@ -415,9 +415,8 @@ class MainActivity : AppCompatActivity() {
     // HOME DATA
     // ─────────────────────────────────────────────
 
- 
+    private lateinit var recentlyPlayedAdapter: HomeCardAdapter
 
-    // Call this at the end of setupUI()
     private fun setupHomeAdapters() {
         recentlyPlayedAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
         binding.recentlyPlayedRecycler.apply {
@@ -427,7 +426,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadHomeData() {
-        // Fix greeting based on actual time
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         binding.homeGreeting.text = when {
             hour < 12 -> "Good morning"
@@ -435,7 +433,7 @@ class MainActivity : AppCompatActivity() {
             else      -> "Good evening"
         }
 
-        // Layer 1: local — instant, no shimmer
+        // Layer 1: local — instant
         val history = LibraryManager.getHistory().takeLast(10).reversed()
         if (history.isNotEmpty()) {
             recentlyPlayedAdapter.submitList(history.map { track ->
@@ -456,8 +454,10 @@ class MainActivity : AppCompatActivity() {
         binding.homeShelvesContainer.removeAllViews()
         showShimmer()
 
+        val seedId = tracks.getOrNull(currentIndex)?.videoId ?: ""
+
         lifecycleScope.launch {
-            val shelves = fetchOnlineShelves()
+            val shelves = fetchOnlineShelves(seedId)
             hideShimmer()
             if (shelves.isNotEmpty()) renderShelves(shelves)
             homeCacheTime = System.currentTimeMillis()
@@ -471,7 +471,6 @@ class MainActivity : AppCompatActivity() {
         shelves.forEach { shelf ->
             if (shelf.items.isEmpty()) return@forEach
 
-            // Section label
             val header = TextView(this).apply {
                 text = shelf.title
                 textSize = 15f
@@ -485,7 +484,6 @@ class MainActivity : AppCompatActivity() {
                 ).apply { topMargin = (4 * resources.displayMetrics.density).toInt() }
             }
 
-            // Horizontal row
             val rv = RecyclerView(this).apply {
                 layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
                 adapter = HomeCardAdapter { card -> onHomeCardClick(card) }
@@ -514,38 +512,65 @@ class MainActivity : AppCompatActivity() {
         binding.homeShimmerContainer.isVisible = false
     }
 
-    // Returns empty list until get_home() is added to main.py
-    private suspend fun fetchOnlineShelves(): List<HomeShelf> {
+    // Parses the actual shape returned by main.py get_home():
+    // {
+    //   "quick_picks": [ HomeCard, ... ],
+    //   "shelves":     [ { "shelfTitle": "...", "items": [ HomeCard, ... ] }, ... ],
+    //   "moods":       [ { "title": "...", "params": "..." }, ... ]
+    // }
+    private suspend fun fetchOnlineShelves(seedVideoId: String): List<HomeShelf> {
         return try {
-            val result = withContext(Dispatchers.IO) {
+            val raw = withContext(Dispatchers.IO) {
                 Python.getInstance().getModule("main")
-                    .callAttr("get_home").toString()
+                    .callAttr("get_home", seedVideoId).toString()
             }
-            if (result.startsWith("ERROR")) return emptyList()
-            val arr = JSONArray(result)
-            (0 until arr.length()).map { i ->
-                val obj   = arr.getJSONObject(i)
-                val items = obj.getJSONArray("items")
-                HomeShelf(
-                    title = obj.getString("title"),
-                    items = (0 until items.length()).map { j ->
-                        val c = items.getJSONObject(j)
-                        HomeCard(
-                            videoId    = c.optString("videoId"),
-                            playlistId = c.optString("playlistId").ifEmpty { null },
-                            title      = c.optString("title", "Unknown"),
-                            artist     = c.optString("artist", ""),
-                            thumbnail  = c.optString("thumbnail", ""),
-                            type       = when (c.optString("type")) {
-                                "album"    -> HomeCardType.ALBUM
-                                "playlist" -> HomeCardType.PLAYLIST
-                                else       -> HomeCardType.TRACK
-                            }
-                        )
+            if (raw.startsWith("ERROR")) return emptyList()
+
+            val root = JSONObject(raw)
+            val result = mutableListOf<HomeShelf>()
+
+            // Quick picks shelf
+            val quickPicks = root.optJSONArray("quick_picks")
+            if (quickPicks != null && quickPicks.length() > 0) {
+                val items = (0 until quickPicks.length()).mapNotNull { i ->
+                    parseHomeCard(quickPicks.getJSONObject(i))
+                }
+                if (items.isNotEmpty()) result.add(HomeShelf("Quick Picks", items))
+            }
+
+            // Trending / editorial shelves
+            val shelves = root.optJSONArray("shelves")
+            if (shelves != null) {
+                for (i in 0 until shelves.length()) {
+                    val shelf = shelves.getJSONObject(i)
+                    val title = shelf.optString("shelfTitle", "").ifEmpty { continue }
+                    val itemsArr = shelf.optJSONArray("items") ?: continue
+                    val items = (0 until itemsArr.length()).mapNotNull { j ->
+                        parseHomeCard(itemsArr.getJSONObject(j))
                     }
-                )
+                    if (items.isNotEmpty()) result.add(HomeShelf(title, items))
+                }
             }
+
+            result
         } catch (_: Exception) { emptyList() }
+    }
+
+    private fun parseHomeCard(obj: JSONObject): HomeCard? {
+        val videoId = obj.optString("videoId", "")
+        val title   = obj.optString("title", "").ifEmpty { return null }
+        return HomeCard(
+            videoId    = videoId,
+            playlistId = obj.optString("playlistId").ifEmpty { null },
+            title      = title,
+            artist     = obj.optString("artist", ""),
+            thumbnail  = obj.optString("thumbnail", ""),
+            type       = when (obj.optString("type", "TRACK").uppercase()) {
+                "ALBUM"    -> HomeCardType.ALBUM
+                "PLAYLIST" -> HomeCardType.PLAYLIST
+                else       -> HomeCardType.TRACK
+            }
+        )
     }
 
     private fun onHomeCardClick(card: HomeCard) {
