@@ -1,4 +1,4 @@
-package com.example.audiofetch
+package com.audiofetch
 
 /**
  * Type of card on the Home screen.
