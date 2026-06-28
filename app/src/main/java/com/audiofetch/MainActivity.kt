@@ -415,7 +415,7 @@ class MainActivity : AppCompatActivity() {
     // HOME DATA
     // ─────────────────────────────────────────────
 
-    private lateinit var recentlyPlayedAdapter: HomeCardAdapter
+    
 
     private fun setupHomeAdapters() {
         recentlyPlayedAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
