@@ -5,19 +5,18 @@ import android.content.Context
 object HomeRepository {
 
     // Fetch home shelves — uses auth cookies if available
-    suspend fun getHome(context: Context): List<HomeShelf> {
-        val cookies = if (AccountManager.isAuthenticated(context)) {
-            // Load raw cookie string from the saved auth file
-            loadSavedCookies(context)
-        } else null
+  suspend fun getHome(context: Context): List<HomeShelf> {
+    val cookies = if (AccountManager.isAuthenticated(context)) {
+        AccountManager.getCookies(context)  // read from same place saveCookies() wrote to
+    } else null
 
-        return try {
-            val raw = InnerTubeClient.getHome(cookies)
-            InnerTubeParser.parseHome(raw)
-        } catch (e: Exception) {
-            emptyList()
-        }
+    return try {
+        val raw = InnerTubeClient.getHome(cookies)
+        InnerTubeParser.parseHome(raw)
+    } catch (e: Exception) {
+        emptyList()
     }
+}
 
     suspend fun getWatchNext(videoId: String, context: Context): List<HomeCard> {
         val cookies = if (AccountManager.isAuthenticated(context)) loadSavedCookies(context) else null
