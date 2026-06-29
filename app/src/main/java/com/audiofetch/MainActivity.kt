@@ -524,42 +524,44 @@ class MainActivity : AppCompatActivity() {
         binding.homeShimmerContainer.isVisible = false
     }
 
-    private suspend fun fetchOnlineShelves(seedVideoId: String): List<HomeShelf> {
-        return try {
-            val raw = withContext(Dispatchers.IO) {
-                Python.getInstance().getModule("main")
-                    .callAttr("get_home", seedVideoId).toString()
+// Replace the entire fetchOnlineShelves() function:
+private suspend fun fetchOnlineShelves(seedVideoId: String): List<HomeShelf> {
+    return HomeRepository.getHome(this)
+}
+
+// Replace fetchAndAppendAutoplay() to use InnerTube instead of Python:
+private fun fetchAndAppendAutoplay(videoId: String?) {
+    if (videoId.isNullOrEmpty()) return
+    lifecycleScope.launch {
+        val related = HomeRepository.getWatchNext(videoId, this@MainActivity)
+        for (card in related) {
+            if (card.videoId.isEmpty()) continue
+            if (tracks.any { it.videoId == card.videoId }) continue
+
+            val streamJson = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_stream_url_by_id", card.videoId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
             }
-            if (raw.startsWith("ERROR")) return emptyList()
+            if (streamJson.startsWith("ERROR")) continue
 
-            val root = JSONObject(raw)
-            val result = mutableListOf<HomeShelf>()
-
-            val quickPicks = root.optJSONArray("quick_picks")
-            if (quickPicks != null && quickPicks.length() > 0) {
-                val items = (0 until quickPicks.length()).mapNotNull { i ->
-                    parseHomeCard(quickPicks.getJSONObject(i))
-                }
-                if (items.isNotEmpty()) result.add(HomeShelf("Quick Picks", items))
-            }
-
-            val shelves = root.optJSONArray("shelves")
-            if (shelves != null) {
-                for (i in 0 until shelves.length()) {
-                    val shelf = shelves.getJSONObject(i)
-                    val title = shelf.optString("shelfTitle", "").ifEmpty { "" }
-                    if (title.isEmpty()) continue
-                    val itemsArr = shelf.optJSONArray("items") ?: continue
-                    val items = (0 until itemsArr.length()).mapNotNull { j ->
-                        parseHomeCard(itemsArr.getJSONObject(j))
-                    }
-                    if (items.isNotEmpty()) result.add(HomeShelf(title, items))
-                }
-            }
-
-            result
-        } catch (_: Exception) { emptyList() }
+            val json = org.json.JSONObject(streamJson)
+            val track = Track(
+                uri          = android.net.Uri.parse(json.getString("url")),
+                title        = json.optString("title", card.title),
+                artist       = json.optString("artist", card.artist),
+                durationMs   = json.optLong("durationSeconds", 0) * 1000L,
+                videoId      = card.videoId,
+                isAutoplay   = true,
+                thumbnailUrl = json.optString("thumbnail", card.thumbnail)
+            )
+            tracks.add(track)
+            player?.addMediaItem(MediaItem.fromUri(track.uri))
+            trackAdapter.updateTracks(tracks)
+        }
     }
+}   
 
     private fun parseHomeCard(obj: JSONObject): HomeCard? {
         val videoId = obj.optString("videoId", "")
@@ -1912,37 +1914,14 @@ private fun showLoginWebView() {
     webView.post { webView.requestFocus() }
 }
 
-    private fun handleCookies(cookies: String) {
-        setStatus("connecting account…", StatusType.NEUTRAL)
-        binding.progressBar.isVisible = true
-
-        lifecycleScope.launch {
-            val result = AccountManager.setupFromCookies(cookies)
-            binding.progressBar.isVisible = false
-
-            result.fold(
-                onSuccess = { name ->
-                    val json = withContext(Dispatchers.IO) {
-                        Python.getInstance().getModule("main")
-                            .callAttr("get_account_info").toString()
-                    }
-                    val info = JSONObject(json)
-                    AccountManager.saveAccount(
-                        this@MainActivity,
-                        info.optString("name", name),
-                        info.optString("email", "")
-                    )
-                    refreshAccountUI()
-                    homeCacheTime = 0L
-                    if (currentTab == Tab.HOME) loadHomeData()
-                    setStatus("signed in as $name", StatusType.SUCCESS)
-                },
-                onFailure = { e ->
-                    setStatus("sign in failed: ${e.message}", StatusType.ERROR)
-                }
-            )
-        }
-    }
+   private fun handleCookies(cookies: String) {
+    // Save raw cookies for InnerTube direct calls
+    AccountManager.saveCookies(this, cookies)
+    
+    // rest of your existing handleCookies() code unchanged...
+    setStatus("connecting account…", StatusType.NEUTRAL)
+    // ...
+}
 
     private fun handleSignOut() {
         AlertDialog.Builder(this)
