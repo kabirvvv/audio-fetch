@@ -1853,28 +1853,13 @@ private fun showLoginWebView() {
     val webView = android.webkit.WebView(this).apply {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.setSupportZoom(true)
-        settings.builtInZoomControls = false
         settings.javaScriptCanOpenWindowsAutomatically = true
         isFocusable = true
         isFocusableInTouchMode = true
-
         android.webkit.CookieManager.getInstance().setAcceptCookie(true)
-
-        webViewClient = object : android.webkit.WebViewClient() {
-            override fun onPageFinished(view: android.webkit.WebView, url: String) {
-                if (url.contains("music.youtube.com") && !url.contains("accounts.google.com")) {
-                    val cookies = android.webkit.CookieManager.getInstance().getCookie(url) ?: return
-                    if (cookies.contains("SAPISID") || cookies.contains("__Secure-3PAPISID")) {
-                        handleCookies(cookies)
-                    }
-                }
-            }
-        }
         loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com")
     }
 
-    // Set third party cookies now that webView is constructed
     android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
     val overlayLayout = android.widget.FrameLayout(this).apply {
@@ -1883,7 +1868,7 @@ private fun showLoginWebView() {
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT
         ))
         val closeBtn = android.widget.Button(this@MainActivity).apply {
-            text = "✕  Close"
+            text = "✕  Cancel"
             textSize = 12f
             setTextColor(android.graphics.Color.WHITE)
             setBackgroundColor(android.graphics.Color.argb(180, 0, 0, 0))
@@ -1902,9 +1887,25 @@ private fun showLoginWebView() {
         android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     )
 
-    // Wire close button after dialog is set up
     (overlayLayout.getChildAt(1) as android.widget.Button).setOnClickListener {
         dialog.dismiss()
+    }
+
+    // ── This is the key part ─────────────────────────────────────────
+    // As soon as the user lands on music.youtube.com, grab cookies
+    // and close the dialog immediately — never show the YTMusic UI
+    webView.webViewClient = object : android.webkit.WebViewClient() {
+        override fun onPageFinished(view: android.webkit.WebView, url: String) {
+            if (url.contains("music.youtube.com")) {
+                val cookies = android.webkit.CookieManager.getInstance()
+                    .getCookie(url) ?: return
+                if (cookies.contains("SAPISID") || cookies.contains("__Secure-3PAPISID")) {
+                    // Dismiss immediately — user never sees YTMusic UI
+                    dialog.dismiss()
+                    handleCookies(cookies)
+                }
+            }
+        }
     }
 
     dialog.show()
