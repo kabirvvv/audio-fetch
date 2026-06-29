@@ -1702,53 +1702,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         }
     }
 
-    // ─────────────────────────────────────────────
-    // AUTOPLAY
-    // ─────────────────────────────────────────────
-
-    private fun fetchAndAppendAutoplay(videoId: String?) {
-        if (videoId.isNullOrEmpty()) return
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_watch_playlist", videoId, 10).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            if (result.startsWith("ERROR")) return@launch
-            try {
-                val arr = JSONArray(result)
-                for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val vid = obj.optString("videoId")
-                    if (vid.isEmpty()) continue
-                    if (tracks.any { it.videoId == vid }) continue
-
-                    val streamJson = withContext(Dispatchers.IO) {
-                        try {
-                            Python.getInstance().getModule("main")
-                                .callAttr("get_stream_url_by_id", vid).toString()
-                        } catch (e: Exception) { "ERROR: ${e.message}" }
-                    }
-                    if (streamJson.startsWith("ERROR")) continue
-
-                    val json = JSONObject(streamJson)
-                    val track = Track(
-                        uri          = Uri.parse(json.getString("url")),
-                        title        = json.optString("title",  obj.optString("title",  "Unknown")),
-                        artist       = json.optString("artist", obj.optString("artist", "")),
-                        durationMs   = json.optLong("durationSeconds", 0) * 1000L,
-                        videoId      = vid,
-                        isAutoplay   = true,
-                        thumbnailUrl = json.optString("thumbnail", "")
-                    )
-                    tracks.add(track)
-                    player?.addMediaItem(MediaItem.fromUri(track.uri))
-                    trackAdapter.updateTracks(tracks)
-                }
-            } catch (_: Exception) {}
-        }
-    }
+  
 
     // ─────────────────────────────────────────────
     // DOWNLOAD
