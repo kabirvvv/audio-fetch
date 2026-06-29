@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 34
 
-        versionCode = 51
+        versionCode = 52
         versionName = "5.0"
 
         ndk {
@@ -74,7 +74,7 @@ chaquopy {
 
 dependencies {
     //okhttp innertube client
-    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation ("com.squareup.okhttp3:okhttp:4.12.0")
     //__________________________________________________
 
     implementation ("com.github.bumptech.glide:glide:4.16.0")
