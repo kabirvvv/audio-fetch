@@ -41,6 +41,54 @@ object InnerTubeParser {
         return shelves
     }
 
+    fun extractContinuation(root: JSONObject): String? {
+    // Check at section list level
+    val sections = root
+        .optJSONObject("contents")
+        ?.optJSONObject("singleColumnBrowseResultsRenderer")
+        ?.optJSONArray("tabs")
+        ?.optJSONObject(0)
+        ?.optJSONObject("tabRenderer")
+        ?.optJSONObject("content")
+        ?.optJSONObject("sectionListRenderer")
+        ?.optJSONArray("continuations")
+        ?.optJSONObject(0)
+        ?.optJSONObject("nextContinuationData")
+        ?.optString("continuation")
+    if (!sections.isNullOrEmpty()) return sections
+
+    // Also check at root continuations level (subsequent pages)
+    return root.optJSONArray("continuationContents")
+        ?.optJSONObject(0)
+        ?.optJSONObject("sectionListContinuation")
+        ?.optJSONArray("continuations")
+        ?.optJSONObject(0)
+        ?.optJSONObject("nextContinuationData")
+        ?.optString("continuation")
+}
+
+fun parseContinuation(root: JSONObject): List<HomeShelf> {
+    val shelves = mutableListOf<HomeShelf>()
+    val sections = root
+        .optJSONObject("continuationContents")
+        ?.optJSONObject("sectionListContinuation")
+        ?.optJSONArray("contents")
+        ?: return emptyList()
+
+    for (i in 0 until sections.length()) {
+        val section = sections.getJSONObject(i)
+        val carousel = section.optJSONObject("musicCarouselShelfRenderer")
+        if (carousel != null) {
+            parseCarousel(carousel)?.let { shelves.add(it) }
+            continue
+        }
+        val musicShelf = section.optJSONObject("musicShelfRenderer")
+        if (musicShelf != null) {
+            parseMusicShelf(musicShelf)?.let { shelves.add(it) }
+        }
+    }
+    return shelves
+}
     // ── Carousel (horizontal row) ─────────────────────────────────────────────
 
     private fun parseCarousel(carousel: JSONObject): HomeShelf? {
