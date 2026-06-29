@@ -73,6 +73,9 @@ chaquopy {
 }
 
 dependencies {
+    //okhttp innertube client
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    //__________________________________________________
 
     implementation ("com.github.bumptech.glide:glide:4.16.0")
     // AndroidX Core
