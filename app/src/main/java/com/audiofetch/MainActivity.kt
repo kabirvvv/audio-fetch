@@ -1855,15 +1855,11 @@ private fun showLoginWebView() {
         settings.domStorageEnabled = true
         settings.setSupportZoom(true)
         settings.builtInZoomControls = false
-        // These two are the critical fixes for keyboard input
         settings.javaScriptCanOpenWindowsAutomatically = true
         isFocusable = true
         isFocusableInTouchMode = true
 
-        android.webkit.CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            setAcceptThirdPartyCookies(this@apply, true)
-        }
+        android.webkit.CookieManager.getInstance().setAcceptCookie(true)
 
         webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageFinished(view: android.webkit.WebView, url: String) {
@@ -1878,38 +1874,40 @@ private fun showLoginWebView() {
         loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com")
     }
 
-    // Use a full-screen dialog instead of AlertDialog so the WebView
-    // gets proper window focus and the keyboard can open
-    val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-    dialog.setContentView(webView)
+    // Set third party cookies now that webView is constructed
+    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
-    // Close button overlay so user can dismiss
-    val closeBtn = android.widget.Button(this).apply {
-        text = "✕  Close"
-        textSize = 12f
-        setTextColor(android.graphics.Color.WHITE)
-        setBackgroundColor(android.graphics.Color.argb(180, 0, 0, 0))
-        setPadding(24, 12, 24, 12)
-        setOnClickListener { dialog.dismiss() }
-    }
     val overlayLayout = android.widget.FrameLayout(this).apply {
         addView(webView, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT
         ))
+        val closeBtn = android.widget.Button(this@MainActivity).apply {
+            text = "✕  Close"
+            textSize = 12f
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(android.graphics.Color.argb(180, 0, 0, 0))
+            setPadding(24, 12, 24, 12)
+        }
         addView(closeBtn, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             android.view.Gravity.TOP or android.view.Gravity.END
         ).apply { setMargins(0, 48, 16, 0) })
     }
+
+    val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
     dialog.setContentView(overlayLayout)
     dialog.window?.setSoftInputMode(
         android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     )
-    dialog.show()
 
-    // Request focus after dialog is shown so keyboard triggers properly
+    // Wire close button after dialog is set up
+    (overlayLayout.getChildAt(1) as android.widget.Button).setOnClickListener {
+        dialog.dismiss()
+    }
+
+    dialog.show()
     webView.post { webView.requestFocus() }
 }
 
