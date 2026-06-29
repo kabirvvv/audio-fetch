@@ -5,14 +5,28 @@ import android.content.Context
 object HomeRepository {
 
     // Fetch home shelves — uses auth cookies if available
-  suspend fun getHome(context: Context): List<HomeShelf> {
-    val cookies = if (AccountManager.isAuthenticated(context)) {
-        AccountManager.getCookies(context)  // read from same place saveCookies() wrote to
-    } else null
+ suspend fun getHome(context: Context): List<HomeShelf> {
+    val cookies = if (AccountManager.isAuthenticated(context))
+        AccountManager.getCookies(context) else null
 
     return try {
-        val raw = InnerTubeClient.getHome(cookies)
-        InnerTubeParser.parseHome(raw)
+        val shelves = mutableListOf<HomeShelf>()
+
+        // First page
+        val firstResponse = InnerTubeClient.getHome(cookies)
+        shelves.addAll(InnerTubeParser.parseHome(firstResponse))
+
+        // Follow continuations (usually 1-2 more pages)
+        var continuation = InnerTubeParser.extractContinuation(firstResponse)
+        var pages = 0
+        while (!continuation.isNullOrEmpty() && pages < 3) {
+            val next = InnerTubeClient.getContinuation(continuation, cookies)
+            shelves.addAll(InnerTubeParser.parseContinuation(next))
+            continuation = InnerTubeParser.extractContinuation(next)
+            pages++
+        }
+
+        shelves
     } catch (e: Exception) {
         emptyList()
     }
