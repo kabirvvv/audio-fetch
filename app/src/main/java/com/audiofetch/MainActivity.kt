@@ -1849,31 +1849,69 @@ class MainActivity : AppCompatActivity() {
         binding.dislikeBtn.isVisible = authed
     }
 
-    private fun showLoginWebView() {
-        val webView = android.webkit.WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+private fun showLoginWebView() {
+    val webView = android.webkit.WebView(this).apply {
+        settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        settings.setSupportZoom(true)
+        settings.builtInZoomControls = false
+        // These two are the critical fixes for keyboard input
+        settings.javaScriptCanOpenWindowsAutomatically = true
+        isFocusable = true
+        isFocusableInTouchMode = true
 
-            webViewClient = object : android.webkit.WebViewClient() {
-                override fun onPageFinished(view: android.webkit.WebView, url: String) {
-                    if (url.contains("music.youtube.com") && !url.contains("accounts.google.com")) {
-                        val cookies = android.webkit.CookieManager.getInstance().getCookie(url) ?: return
-                        if (cookies.contains("SAPISID") || cookies.contains("__Secure-3PAPISID")) {
-                            handleCookies(cookies)
-                        }
+        android.webkit.CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+            setAcceptThirdPartyCookies(this@apply, true)
+        }
+
+        webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(view: android.webkit.WebView, url: String) {
+                if (url.contains("music.youtube.com") && !url.contains("accounts.google.com")) {
+                    val cookies = android.webkit.CookieManager.getInstance().getCookie(url) ?: return
+                    if (cookies.contains("SAPISID") || cookies.contains("__Secure-3PAPISID")) {
+                        handleCookies(cookies)
                     }
                 }
             }
-            loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com")
         }
-
-        AlertDialog.Builder(this)
-            .setTitle("Sign in to YouTube Music")
-            .setView(webView)
-            .setNegativeButton("Cancel", null)
-            .show()
+        loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com")
     }
+
+    // Use a full-screen dialog instead of AlertDialog so the WebView
+    // gets proper window focus and the keyboard can open
+    val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+    dialog.setContentView(webView)
+
+    // Close button overlay so user can dismiss
+    val closeBtn = android.widget.Button(this).apply {
+        text = "✕  Close"
+        textSize = 12f
+        setTextColor(android.graphics.Color.WHITE)
+        setBackgroundColor(android.graphics.Color.argb(180, 0, 0, 0))
+        setPadding(24, 12, 24, 12)
+        setOnClickListener { dialog.dismiss() }
+    }
+    val overlayLayout = android.widget.FrameLayout(this).apply {
+        addView(webView, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        addView(closeBtn, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.TOP or android.view.Gravity.END
+        ).apply { setMargins(0, 48, 16, 0) })
+    }
+    dialog.setContentView(overlayLayout)
+    dialog.window?.setSoftInputMode(
+        android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+    )
+    dialog.show()
+
+    // Request focus after dialog is shown so keyboard triggers properly
+    webView.post { webView.requestFocus() }
+}
 
     private fun handleCookies(cookies: String) {
         setStatus("connecting account…", StatusType.NEUTRAL)
