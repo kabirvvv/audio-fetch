@@ -1868,13 +1868,14 @@ private fun showLoginWebView() {
     webView.post { webView.requestFocus() }
 }
 
-   private fun handleCookies(cookies: String) {
-    // Save raw cookies for InnerTube direct calls
+ private fun handleCookies(cookies: String) {
     AccountManager.saveCookies(this, cookies)
-    
-    // rest of your existing handleCookies() code unchanged...
-    setStatus("connecting account…", StatusType.NEUTRAL)
-    // ...
+    refreshAccountUI()
+    homeCacheTime = 0L
+    homeDataCache = emptyList()
+    if (currentTab == Tab.HOME) loadHomeData()
+    setStatus("account connected", StatusType.SUCCESS)
+
 }
 
     private fun handleSignOut() {
