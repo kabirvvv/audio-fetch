@@ -57,26 +57,27 @@ object HomeRepository {
             ?.optJSONArray("contents")
             ?: return emptyList()
 
-        for (i in 0 until playlist.length()) {
-            val r = playlist.getJSONObject(i)
-                .optJSONObject("playlistPanelVideoRenderer") ?: continue
-            val videoId = r.optString("videoId").ifEmpty { continue }
-            val title = r.optJSONObject("title")
-                ?.optJSONArray("runs")?.optJSONObject(0)
-                ?.optString("text") ?: continue
-            val artist = r.optJSONObject("longBylineText")
-                ?.optJSONArray("runs")?.optJSONObject(0)
-                ?.optString("text") ?: ""
-            val thumbnail = r.optJSONObject("thumbnail")
-                ?.optJSONArray("thumbnails")
-                ?.let { thumbs ->
-                    if (thumbs.length() > 0)
-                        thumbs.getJSONObject(thumbs.length() - 1).optString("url")
-                    else ""
-                } ?: ""
-            items.add(HomeCard(videoId = videoId, title = title, artist = artist,
-                thumbnail = thumbnail, type = HomeCardType.TRACK))
-        }
-        return items
+       for (i in 0 until playlist.length()) {
+    val r = playlist.getJSONObject(i)
+        .optJSONObject("playlistPanelVideoRenderer") ?: continue
+   val videoId = r.optString("videoId")
+   if (videoId.isEmpty()) continue
+    val title = r.optJSONObject("title")
+        ?.optJSONArray("runs")?.optJSONObject(0)
+        ?.optString("text") ?: continue
+    val artist = r.optJSONObject("longBylineText")
+        ?.optJSONArray("runs")?.optJSONObject(0)
+        ?.optString("text") ?: ""
+    val thumbnail = r.optJSONObject("thumbnail")
+        ?.optJSONArray("thumbnails")
+        ?.let { thumbs ->
+            if (thumbs.length() > 0)
+                thumbs.getJSONObject(thumbs.length() - 1).optString("url")
+            else ""
+        } ?: ""
+    items.add(HomeCard(videoId = videoId, title = title, artist = artist,
+        thumbnail = thumbnail, type = HomeCardType.TRACK))
+}
+return items
     }
 }
