@@ -23,8 +23,7 @@ fun getCookies(context: Context): String? {
         .getString("yt_cookies", null)
 }
     fun isAuthenticated(ctx: Context): Boolean =
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUTH, false)
+    !getCookies(ctx).isNullOrEmpty()
 
     fun getDisplayName(ctx: Context): String =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
