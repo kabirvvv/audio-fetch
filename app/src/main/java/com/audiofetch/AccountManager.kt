@@ -13,6 +13,15 @@ object AccountManager {
     private const val KEY_EMAIL = "email"
     private const val KEY_AUTH  = "authenticated"
 
+    fun saveCookies(context: Context, cookies: String) {
+    context.getSharedPreferences("account", Context.MODE_PRIVATE)
+        .edit().putString("yt_cookies", cookies).apply()
+}
+
+fun getCookies(context: Context): String? {
+    return context.getSharedPreferences("account", Context.MODE_PRIVATE)
+        .getString("yt_cookies", null)
+}
     fun isAuthenticated(ctx: Context): Boolean =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_AUTH, false)
