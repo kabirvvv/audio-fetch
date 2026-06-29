@@ -81,6 +81,13 @@ object InnerTubeClient {
         }
         post(BROWSE_URL, body, cookies)
     }
+    suspend fun getContinuation(continuation: String, cookies: String? = null): JSONObject =
+    withContext(Dispatchers.IO) {
+        val body = baseContext(cookies).apply {
+            put("continuation", continuation)
+        }
+        post(BROWSE_URL, body, cookies)
+    }
 
     suspend fun getWatchNext(videoId: String, cookies: String? = null): JSONObject =
         withContext(Dispatchers.IO) {
