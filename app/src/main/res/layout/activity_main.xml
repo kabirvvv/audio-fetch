@@ -13,9 +13,6 @@
         android:layout_height="match_parent"
         android:background="#020503" />
 
-    <!-- ═══════════════════════════════════════════
-         TAB 1: SEARCH CONTAINER
-         ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/searchContainer"
         android:layout_width="match_parent"
@@ -32,7 +29,6 @@
             android:paddingTop="56dp"
             android:paddingBottom="16dp">
 
-            <!-- Top bar -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
@@ -59,7 +55,6 @@
                     android:contentDescription="Settings" />
             </FrameLayout>
 
-            <!-- Search input -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
@@ -84,7 +79,6 @@
                     android:singleLine="true" />
             </FrameLayout>
 
-            <!-- Fetch button -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -102,7 +96,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Status -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -131,9 +124,6 @@
 
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════
-         TAB 2: HOME CONTAINER
-         ═══════════════════════════════════════════ -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/homeContainer"
         android:layout_width="match_parent"
@@ -150,7 +140,6 @@
             android:orientation="vertical"
             android:paddingTop="56dp">
 
-            <!-- Greeting -->
             <TextView
                 android:id="@+id/homeGreeting"
                 android:layout_width="match_parent"
@@ -163,9 +152,6 @@
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.02" />
 
-            <!-- ── LAYER 1: LOCAL (instant) ── -->
-
-            <!-- Recently Played -->
             <LinearLayout
                 android:id="@+id/recentlyPlayedSection"
                 android:layout_width="match_parent"
@@ -197,9 +183,6 @@
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
             </LinearLayout>
 
-            <!-- ── LAYER 2: ONLINE (loads in background) ── -->
-
-            <!-- Shimmer placeholder: shown while online shelves load -->
             <LinearLayout
                 android:id="@+id/homeShimmerContainer"
                 android:layout_width="match_parent"
@@ -208,7 +191,6 @@
                 android:paddingHorizontal="20dp"
                 android:visibility="gone">
 
-                <!-- Shimmer row 1 -->
                 <View
                     android:layout_width="120dp"
                     android:layout_height="14dp"
@@ -239,7 +221,6 @@
                         android:background="@drawable/bg_shimmer_card" />
                 </LinearLayout>
 
-                <!-- Shimmer row 2 -->
                 <View
                     android:layout_width="90dp"
                     android:layout_height="14dp"
@@ -270,7 +251,6 @@
                         android:background="@drawable/bg_shimmer_card" />
                 </LinearLayout>
 
-                <!-- Shimmer row 3 -->
                 <View
                     android:layout_width="140dp"
                     android:layout_height="14dp"
@@ -303,14 +283,12 @@
 
             </LinearLayout>
 
-            <!-- Dynamic shelves injected here by renderShelves() -->
             <LinearLayout
                 android:id="@+id/homeShelvesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <!-- Moods & Genres (chips) — populated after get_mood_categories() -->
             <LinearLayout
                 android:id="@+id/moodsSection"
                 android:layout_width="match_parent"
@@ -345,9 +323,6 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ═══════════════════════════════════════════
-         TAB 3: LIBRARY CONTAINER
-         ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/libraryContainer"
         android:layout_width="match_parent"
@@ -383,7 +358,6 @@
                 android:contentDescription="Close library" />
         </RelativeLayout>
 
-        <!-- Normal library view -->
         <LinearLayout
             android:id="@+id/libraryNormalSection"
             android:layout_width="match_parent"
@@ -498,7 +472,6 @@
 
         </LinearLayout>
 
-        <!-- Playlist detail view -->
         <LinearLayout
             android:id="@+id/playlistDetailSection"
             android:layout_width="match_parent"
@@ -553,10 +526,6 @@
 
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════
-         MINI PLAYER  (above bottom nav, GONE until music plays)
-         layout_marginBottom = 56dp (nav height)
-         ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/miniPlayer"
         android:layout_width="match_parent"
@@ -570,14 +539,12 @@
         android:clickable="true"
         android:focusable="true">
 
-        <!-- Thin progress line at top edge -->
         <View
             android:id="@+id/miniPlayerProgressLine"
             android:layout_width="0dp"
             android:layout_height="2dp"
             android:background="#00FFA2" />
 
-        <!-- Content row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -641,9 +608,6 @@
 
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════
-         BOTTOM NAV  (3 tabs: Search | Home | Library)
-         ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/bottomNav"
         android:layout_width="match_parent"
@@ -733,12 +697,6 @@
 
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════
-         FULL PLAYER SHEET
-         Slides up from bottom over everything.
-         elevation=32dp — highest in the layout.
-         Initial state: GONE + translationY = screen height (set in code).
-         ═══════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/fullPlayerSheet"
         android:layout_width="match_parent"
@@ -763,7 +721,6 @@
                 android:paddingTop="56dp"
                 android:paddingBottom="32dp">
 
-                <!-- Drag handle -->
                 <View
                     android:layout_width="40dp"
                     android:layout_height="4dp"
@@ -773,7 +730,6 @@
                     android:outlineProvider="background"
                     android:clipToOutline="true" />
 
-                <!-- Album art with glow -->
                 <FrameLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -801,7 +757,6 @@
                         android:contentDescription="Album art" />
                 </FrameLayout>
 
-                <!-- Track info -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -834,7 +789,6 @@
                         android:gravity="center" />
                 </LinearLayout>
 
-                <!-- Progress area + download button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -888,17 +842,6 @@
                             android:tint="#00FFA2"
                             android:visibility="gone"
                             android:contentDescription="Download current track" />
-                        <ImageButton
-    android:id="@+id/dislikeBtn"
-    android:src="@drawable/ic_thumb_down"
-    android:visibility="gone"
-    ... />
-
-<ImageButton
-    android:id="@+id/likeBtn"
-    android:src="@drawable/ic_thumb_up"
-    android:visibility="gone"
-    ... />
                     </FrameLayout>
 
                     <com.audiofetch.VibeSeekBar
@@ -907,14 +850,12 @@
                         android:layout_height="20dp" />
                 </LinearLayout>
 
-                <!-- Visualizer -->
                 <com.audiofetch.VibeVisualizer
                     android:id="@+id/visualizer"
                     android:layout_width="match_parent"
                     android:layout_height="60dp"
                     android:layout_marginBottom="24dp" />
 
-                <!-- Playback controls -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1000,6 +941,28 @@
                         android:tint="#80FFFFFF"
                         android:alpha="0.5"
                         android:contentDescription="Lyrics" />
+
+                    <ImageButton
+                        android:id="@+id/dislikeBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_thumb_down"
+                        android:tint="#60FFFFFF"
+                        android:visibility="gone"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="Dislike" />
+
+                    <ImageButton
+                        android:id="@+id/likeBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_thumb_up"
+                        android:tint="#60FFFFFF"
+                        android:visibility="gone"
+                        android:layout_marginStart="4dp"
+                        android:contentDescription="Like" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -1007,9 +970,6 @@
 
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════
-         QUEUE BOTTOM SHEET
-         ═══════════════════════════════════════════ -->
     <FrameLayout
         android:id="@+id/playlistSheet"
         android:layout_width="match_parent"
@@ -1083,9 +1043,6 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- ═══════════════════════════════════════════
-         SEARCH RESULTS BOTTOM SHEET
-         ═══════════════════════════════════════════ -->
     <FrameLayout
         android:id="@+id/searchSheet"
         android:layout_width="match_parent"
@@ -1152,9 +1109,6 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- ═══════════════════════════════════════════
-         SETTINGS SIDE PANEL
-         ═══════════════════════════════════════════ -->
     <FrameLayout
         android:id="@+id/settingsPanel"
         android:layout_width="300dp"
@@ -1220,24 +1174,48 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="16dp" />
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
+                <LinearLayout 
+                    android:layout_width="match_parent" 
+                    android:layout_height="wrap_content" 
+                    android:orientation="vertical" 
+                    android:layout_marginBottom="12dp">
+                    <LinearLayout 
+                        android:layout_width="match_parent" 
+                        android:layout_height="wrap_content" 
+                        android:orientation="horizontal" 
+                        android:layout_marginBottom="4dp">
                         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Lows" android:textColor="#CCFFFFFF" android:textSize="12sp" />
                         <TextView android:id="@+id/eqLowVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
                     <SeekBar android:id="@+id/eqLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="12dp">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
+                <LinearLayout 
+                    android:layout_width="match_parent" 
+                    android:layout_height="wrap_content" 
+                    android:orientation="vertical" 
+                    android:layout_marginBottom="12dp">
+                    <LinearLayout 
+                        android:layout_width="match_parent" 
+                        android:layout_height="wrap_content" 
+                        android:orientation="horizontal" 
+                        android:layout_marginBottom="4dp">
                         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Mids" android:textColor="#CCFFFFFF" android:textSize="12sp" />
                         <TextView android:id="@+id/eqMidVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
                     <SeekBar android:id="@+id/eqMid" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="28dp">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
+                <LinearLayout 
+                    android:layout_width="match_parent" 
+                    android:layout_height="wrap_content" 
+                    android:orientation="vertical" 
+                    android:layout_marginBottom="28dp">
+                    <LinearLayout 
+                        android:layout_width="match_parent" 
+                        android:layout_height="wrap_content" 
+                        android:orientation="horizontal" 
+                        android:layout_marginBottom="4dp">
                         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Highs" android:textColor="#CCFFFFFF" android:textSize="12sp" />
                         <TextView android:id="@+id/eqHighVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
@@ -1276,39 +1254,69 @@
                     app:columnCount="4"
                     android:layout_marginBottom="28dp" />
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="ACCOUNT"
+                    android:textColor="#60FFFFFF"
+                    android:textSize="9sp"
+                    android:letterSpacing="0.15"
+                    android:layout_marginBottom="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/accountSignedOutGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="16dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Connect your YouTube Music account for personalised recommendations."
+                        android:textColor="#80FFFFFF"
+                        android:textSize="12sp"
+                        android:layout_marginBottom="12dp" />
+                    <Button
+                        android:id="@+id/connectAccountBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Sign in with Google"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/accountSignedInGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="16dp">
+                    <TextView
+                        android:id="@+id/accountNameText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginBottom="2dp" />
+                    <TextView
+                        android:id="@+id/accountEmailText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#80FFFFFF"
+                        android:textSize="12sp"
+                        android:layout_marginBottom="12dp" />
+                    <Button
+                        android:id="@+id/signOutBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Sign out"
+                        android:textSize="13sp" />
+                </LinearLayout>
             </LinearLayout>
-            <!-- Account section — paste this inside your settings ScrollView -->
-<TextView
-    android:text="Account"
-    ... />
-
-<!-- Signed-out state -->
-<LinearLayout
-    android:id="@+id/accountSignedOutGroup"
-    android:orientation="vertical"
-    ... >
-    <TextView android:text="Connect your YouTube Music account for personalised recommendations." ... />
-    <Button
-        android:id="@+id/connectAccountBtn"
-        android:text="Sign in with Google"
-        ... />
-</LinearLayout>
-
-<!-- Signed-in state -->
-<LinearLayout
-    android:id="@+id/accountSignedInGroup"
-    android:orientation="vertical"
-    ... >
-    <TextView android:id="@+id/accountNameText"  ... />
-    <TextView android:id="@+id/accountEmailText" ... />
-    <Button android:id="@+id/signOutBtn" android:text="Sign out" ... />
-</LinearLayout>
         </ScrollView>
     </FrameLayout>
 
-    <!-- ═══════════════════════════════════════════
-         SCRIM  (shared by all overlays)
-         ═══════════════════════════════════════════ -->
     <View
         android:id="@+id/scrim"
         android:layout_width="match_parent"
@@ -1320,9 +1328,6 @@
         android:focusable="true"
         android:elevation="34dp" />
 
-    <!-- ═══════════════════════════════════════════
-         LYRICS SHEET  (full-screen overlay, above scrim)
-         ═══════════════════════════════════════════ -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/lyricsSheet"
         android:layout_width="match_parent"
@@ -1384,12 +1389,7 @@
             app:layout_constraintTop_toBottomOf="@id/lyricsBackBtn" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
-    <!-- ═══════════════════════════════════════════
-         PLAYLIST/ALBUM BROWSE SHEET (home page)
-         Same pattern as searchSheet.
-         Add this just before the closing </androidx.coordinatorlayout.widget.CoordinatorLayout>
-         tag, after the searchSheet FrameLayout.
-         ═══════════════════════════════════════════ -->
+
     <FrameLayout
         android:id="@+id/playlistBrowseSheet"
         android:layout_width="match_parent"
