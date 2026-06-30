@@ -63,6 +63,7 @@ object InnerTubeClient {
                 headers["Authorization"] = "SAPISIDHASH ${timestamp}_$hash"
             }
         }
+        android.util.Log.d("AudioFetchAuth", "Extracted SAPISID: $sapisid")
         return headers
     }
 
