@@ -28,6 +28,7 @@ object HomeRepository {
 
         shelves
     } catch (e: Exception) {
+         android.util.Log.e("AudioFetchAuth", "getHome failed", e)
         emptyList()
     }
 }
