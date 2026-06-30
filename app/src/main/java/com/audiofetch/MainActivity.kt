@@ -1813,7 +1813,7 @@ private fun showLoginWebView() {
         isFocusable = true
         isFocusableInTouchMode = true
         android.webkit.CookieManager.getInstance().setAcceptCookie(true)
-        loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com")
+        loadUrl("https://accounts.google.com/AccountChooser?service=youtube&continue=https://music.youtube.com&prompt=select_account")
     }
 
     android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
