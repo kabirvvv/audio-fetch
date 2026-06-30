@@ -57,13 +57,14 @@ object InnerTubeClient {
     .map { it.trim() }
     .firstOrNull { it.startsWith("SAPISID=") }
     ?.substringAfter("=")
+    android.util.Log.d("AudioFetchAuth", "Extracted SAPISID: $sapisid")
             if (sapisid != null) {
                 val timestamp = System.currentTimeMillis() / 1000
                 val hash = sapisidHash(timestamp, sapisid)
                 headers["Authorization"] = "SAPISIDHASH ${timestamp}_$hash"
             }
         }
-        android.util.Log.d("AudioFetchAuth", "Extracted SAPISID: $sapisid")
+        
         return headers
     }
 
