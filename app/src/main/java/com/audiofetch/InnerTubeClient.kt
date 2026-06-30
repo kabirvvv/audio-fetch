@@ -53,10 +53,10 @@ object InnerTubeClient {
         if (!cookies.isNullOrEmpty()) {
             headers["Cookie"] = cookies
             // Extract SAPISID for auth hash
-            val sapisid = cookies.split(";")
-                .map { it.trim() }
-                .firstOrNull { it.startsWith("SAPISID=") || it.startsWith("__Secure-3PAPISID=") }
-                ?.substringAfter("=")
+          val sapisid = cookies.split(";")
+    .map { it.trim() }
+    .firstOrNull { it.startsWith("SAPISID=") }
+    ?.substringAfter("=")
             if (sapisid != null) {
                 val timestamp = System.currentTimeMillis() / 1000
                 val hash = sapisidHash(timestamp, sapisid)
