@@ -31,7 +31,7 @@ object InnerTubeClient {
                     put("clientName", "WEB_REMIX")
                     put("clientVersion", "1.20250601.01.00")
                     put("hl", "en")
-                    put("gl", "US")
+                    put("gl", "in")
                     put("userAgent",
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                         "AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -52,6 +52,7 @@ object InnerTubeClient {
         )
         if (!cookies.isNullOrEmpty()) {
             headers["Cookie"] = cookies
+            headers["X-Goog-AuthUser"] = "0"
             // Extract SAPISID for auth hash
           val sapisid = cookies.split(";")
     .map { it.trim() }
@@ -115,6 +116,7 @@ object InnerTubeClient {
         buildHeaders(cookies).forEach { (k, v) -> requestBuilder.addHeader(k, v) }
         val response = client.newCall(requestBuilder.build()).execute()
         val responseBody = response.body?.string() ?: "{}"
+        android.util.Log.d("AudioFetchAuth", "Response snippet: ${responseBody.take(500)}")
         return JSONObject(responseBody)
     }
 }
