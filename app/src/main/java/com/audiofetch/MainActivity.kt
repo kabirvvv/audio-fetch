@@ -1869,6 +1869,8 @@ private fun showLoginWebView() {
 }
 
  private fun handleCookies(cookies: String) {
+    android.util.Log.d("AudioFetchAuth", "Raw cookies: $cookies")
+    AccountManager.saveCookies(this, cookies)
     AccountManager.saveCookies(this, cookies)
     refreshAccountUI()
     homeCacheTime = 0L
