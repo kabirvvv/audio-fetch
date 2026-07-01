@@ -31,7 +31,7 @@ object InnerTubeClient {
                     put("clientName", "WEB_REMIX")
                     put("clientVersion", "1.20250601.01.00")
                     put("hl", "en")
-                    put("gl", "in")
+                    put("gl", "us")
                     put("userAgent",
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                         "AppleWebKit/537.36 (KHTML, like Gecko) " +
