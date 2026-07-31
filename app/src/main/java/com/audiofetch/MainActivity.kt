@@ -1022,6 +1022,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         )
         presets.forEach { name ->
             val chip = buildChip(name, isActive = name == "Flat")
+            if (name == "Flat") binding.eqPresets.tag = chip
             chip.setOnClickListener {
                 val (l, m, h) = presetValues[name] ?: Triple(12, 12, 12)
                 binding.eqLow.progress = l; binding.eqMid.progress = m; binding.eqHigh.progress = h
@@ -1035,6 +1036,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         val options = listOf("Off" to 0, "30m" to 30, "1h" to 60, "2h" to 120, "3h" to 180)
         options.forEach { (label, mins) ->
             val chip = buildChip(label, isActive = mins == 0)
+            if (mins == 0) binding.timerChips.tag = chip
             chip.setOnClickListener { setSleepTimer(mins); updateChipSelection(binding.timerChips, chip) }
             binding.timerChips.addView(chip)
         }
@@ -1087,6 +1089,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     }
 
     private fun updateChipSelection(container: LinearLayout, selected: TextView) {
+        container.tag = selected
         for (i in 0 until container.childCount) {
             val chip = container.getChildAt(i) as? TextView ?: continue
             val isSelected = chip == selected
@@ -1143,6 +1146,13 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         binding.miniPlayerProgressLine.setBackgroundColor(theme.accentColor)
         binding.searchSheetProgress.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
         binding.playlistBrowseProgress.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
+        (binding.eqPresets.tag as? TextView)?.let { updateChipSelection(binding.eqPresets, it) }
+        (binding.timerChips.tag as? TextView)?.let { updateChipSelection(binding.timerChips, it) }
+        (binding.connectAccountBtn.background.mutate() as? GradientDrawable)?.setColor(theme.accentColor)
+        binding.signOutBtn.setTextColor(theme.accentColor)
+        (binding.signOutBtn.background.mutate() as? GradientDrawable)?.setStroke(
+            (1 * resources.displayMetrics.density).toInt(), theme.accentColor
+        )
         trackAdapter.accentColor = theme.accentColor
         libraryAdapter.accentColor = theme.accentColor
         trackAdapter.notifyDataSetChanged()
