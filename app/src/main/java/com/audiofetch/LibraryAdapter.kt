@@ -13,7 +13,7 @@ class LibraryAdapter(
     private val onLongPress: (Track, View) -> Unit
 ) : RecyclerView.Adapter<LibraryAdapter.VH>() {
 
-    var accentColor: Int = 0xFF00E676.toInt()
+    var accentColor: Int = 0xFF00FFA2.toInt()
 
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
         val title:    TextView  = v.findViewById(R.id.libTrackTitle)
