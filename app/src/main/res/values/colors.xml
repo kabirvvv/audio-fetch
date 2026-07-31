@@ -44,6 +44,7 @@
     <!-- Structure -->
     <color name="divider">#20FFFFFF</color>
     <color name="scrim">#000000</color>
+    <color name="text_on_accent">#000000</color>
 
     <!-- Elevated surfaces (sheets, panels) -->
     <color name="surface_elevated">#FF0A0A0A</color>
