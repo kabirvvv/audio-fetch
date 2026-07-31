@@ -2,12 +2,14 @@
 <resources>
 
     <!-- ===================================================== -->
-    <!-- Semantic Colors (Default: Emerald Theme) -->
+    <!-- Semantic Colors (Default: Emerald Theme)                -->
+    <!-- These back Theme.AudioFetch and now match the actual    -->
+    <!-- Emerald vibe values used throughout the custom UI.       -->
     <!-- ===================================================== -->
 
-    <color name="accent">#00E5A0</color>
-    <color name="surface">#1A2A22</color>
-    <color name="bg">#0D1A14</color>
+    <color name="accent">#00FFA2</color>
+    <color name="surface">#0A1F11</color>
+    <color name="bg">#020503</color>
     <color name="text">#FFFFFF</color>
 
     <!-- ===================================================== -->
@@ -25,8 +27,37 @@
     <color name="bg_deep">#020503</color>
     <color name="glass_border">#1AFFFFFF</color>
 
+    <!-- Text, on a black/near-black background, by descending emphasis -->
     <color name="text_high">#FFFFFF</color>
+    <color name="text_secondary">#CCFFFFFF</color>
     <color name="text_low">#80FFFFFF</color>
+    <color name="text_dim">#60FFFFFF</color>
+    <color name="text_faint">#40FFFFFF</color>
+    <color name="text_label">#33FFFFFF</color>
+
+    <!-- Icon tints -->
+    <color name="icon_high">#FFFFFF</color>
+    <color name="icon_muted">#99FFFFFF</color>
+    <color name="icon_dim">#80FFFFFF</color>
+    <color name="icon_faint">#60FFFFFF</color>
+
+    <!-- Structure -->
+    <color name="divider">#20FFFFFF</color>
+    <color name="scrim">#000000</color>
+
+    <!-- Elevated surfaces (sheets, panels) -->
+    <color name="surface_elevated">#FF0A0A0A</color>
+    <color name="overlay_mini_player">#EE121212</color>
+    <color name="overlay_bottom_nav">#EE020503</color>
+
+    <!-- Misc component colors -->
+    <color name="mood_chip_fill">#1E1E1E</color>
+    <color name="shimmer">#1A1A1A</color>
+    <color name="panel_bg">#F2080808</color>
+    <color name="input_fill">#08FFFFFF</color>
+    <color name="accent_faint">#1A00FFA2</color>
+    <color name="accent_subtle">#0D00FFA2</color>
+    <color name="accent_stroke">#9900FFA2</color>
 
     <!-- ===================================================== -->
     <!-- Emerald (Default) -->
