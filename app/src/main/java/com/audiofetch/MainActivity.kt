@@ -1139,6 +1139,10 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             it.thumbTintList    = android.content.res.ColorStateList.valueOf(theme.accentColor)
         }
         listOf(binding.eqLowVal, binding.eqMidVal, binding.eqHighVal).forEach { it.setTextColor(theme.accentColor) }
+        binding.newPlaylistBtn.setTextColor(theme.accentColor)
+        binding.miniPlayerProgressLine.setBackgroundColor(theme.accentColor)
+        binding.searchSheetProgress.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
+        binding.playlistBrowseProgress.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
         trackAdapter.accentColor = theme.accentColor
         libraryAdapter.accentColor = theme.accentColor
         trackAdapter.notifyDataSetChanged()
