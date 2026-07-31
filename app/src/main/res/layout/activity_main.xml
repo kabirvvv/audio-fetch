@@ -5,13 +5,13 @@
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#020503">
+    android:background="@color/bg_deep">
 
     <View
         android:id="@+id/bgVibe"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#020503" />
+        android:background="@color/bg_deep" />
 
     <LinearLayout
         android:id="@+id/searchContainer"
@@ -39,7 +39,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
                     android:text="AudioFetch"
-                    android:textColor="#33FFFFFF"
+                    android:textColor="@color/text_label"
                     android:textSize="11sp"
                     android:letterSpacing="0.15"
                     android:fontFamily="sans-serif-medium" />
@@ -51,7 +51,7 @@
                     android:layout_gravity="center_vertical|end"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_menu_dots"
-                    android:tint="#80FFFFFF"
+                    android:tint="@color/icon_dim"
                     android:contentDescription="Settings" />
             </FrameLayout>
 
@@ -66,8 +66,8 @@
                     android:layout_height="56dp"
                     android:background="@drawable/bg_input"
                     android:hint="@string/hint_search"
-                    android:textColorHint="#40FFFFFF"
-                    android:textColor="#FFFFFF"
+                    android:textColorHint="@color/text_faint"
+                    android:textColor="@color/text_high"
                     android:textSize="14sp"
                     android:letterSpacing="0.05"
                     android:paddingStart="24dp"
@@ -91,7 +91,7 @@
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_search"
-                    android:tint="#00FFA2"
+                    android:tint="@color/accent"
                     android:contentDescription="Stream" />
             </LinearLayout>
         </LinearLayout>
@@ -108,7 +108,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:indeterminate="true"
-                android:indeterminateTint="#00FFA2"
+                android:indeterminateTint="@color/accent"
                 android:visibility="gone"
                 android:layout_marginBottom="8dp" />
 
@@ -117,7 +117,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="11sp"
-                android:textColor="#60FFFFFF"
+                android:textColor="@color/text_dim"
                 android:gravity="center"
                 android:letterSpacing="0.05" />
         </LinearLayout>
@@ -147,7 +147,7 @@
                 android:paddingHorizontal="20dp"
                 android:paddingBottom="16dp"
                 android:text="Good evening"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_high"
                 android:textSize="22sp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.02" />
@@ -165,7 +165,7 @@
                     android:paddingHorizontal="20dp"
                     android:paddingBottom="10dp"
                     android:text="Recently Played"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium" />
 
@@ -302,7 +302,7 @@
                     android:paddingHorizontal="20dp"
                     android:paddingBottom="10dp"
                     android:text="Moods &amp; Genres"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium" />
 
@@ -328,7 +328,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#020503"
+        android:background="@color/bg_deep"
         android:paddingBottom="120dp"
         android:visibility="gone">
 
@@ -342,7 +342,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
                 android:text="Library"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_high"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -354,7 +354,7 @@
                 android:layout_centerVertical="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_close"
-                android:tint="#60FFFFFF"
+                android:tint="@color/icon_faint"
                 android:contentDescription="Close library" />
         </RelativeLayout>
 
@@ -380,7 +380,7 @@
                     android:gravity="center"
                     android:text="Downloads"
                     android:textSize="13sp"
-                    android:textColor="#00FFA2" />
+                    android:textColor="@color/accent" />
 
                 <TextView
                     android:id="@+id/libTabLocal"
@@ -390,7 +390,7 @@
                     android:gravity="center"
                     android:text="Local"
                     android:textSize="13sp"
-                    android:textColor="#40FFFFFF" />
+                    android:textColor="@color/text_faint" />
 
                 <TextView
                     android:id="@+id/libTabHistory"
@@ -400,14 +400,14 @@
                     android:gravity="center"
                     android:text="History"
                     android:textSize="13sp"
-                    android:textColor="#40FFFFFF" />
+                    android:textColor="@color/text_faint" />
 
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#20FFFFFF"
+                android:background="@color/divider"
                 android:layout_marginBottom="4dp" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -423,7 +423,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#20FFFFFF" />
+                android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/playlistsSection"
@@ -442,7 +442,7 @@
                         android:layout_height="wrap_content"
                         android:layout_centerVertical="true"
                         android:text="Playlists"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_high"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -454,7 +454,7 @@
                         android:layout_centerVertical="true"
                         android:text="+ New"
                         android:textSize="12sp"
-                        android:textColor="#00FFA2"
+                        android:textColor="@color/accent"
                         android:backgroundTint="@android:color/transparent" />
 
                 </RelativeLayout>
@@ -493,7 +493,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="← Back"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:backgroundTint="@android:color/transparent" />
 
                 <TextView
@@ -502,7 +502,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:paddingHorizontal="8dp"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -511,7 +511,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#20FFFFFF"
+                android:background="@color/divider"
                 android:layout_marginBottom="4dp" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -533,7 +533,7 @@
         android:layout_gravity="bottom"
         android:layout_marginBottom="56dp"
         android:orientation="vertical"
-        android:background="#EE121212"
+        android:background="@color/overlay_mini_player"
         android:elevation="16dp"
         android:visibility="gone"
         android:clickable="true"
@@ -543,7 +543,7 @@
             android:id="@+id/miniPlayerProgressLine"
             android:layout_width="0dp"
             android:layout_height="2dp"
-            android:background="#00FFA2" />
+            android:background="@color/accent" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -575,7 +575,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="—"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="13sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
@@ -587,7 +587,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text=""
-                    android:textColor="#80FFFFFF"
+                    android:textColor="@color/text_low"
                     android:textSize="11sp"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -601,7 +601,7 @@
                 android:layout_marginStart="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_play"
-                android:tint="#FFFFFF"
+                android:tint="@color/icon_high"
                 android:contentDescription="Play/Pause" />
 
         </LinearLayout>
@@ -614,7 +614,7 @@
         android:layout_height="56dp"
         android:layout_gravity="bottom"
         android:orientation="horizontal"
-        android:background="#EE020503"
+        android:background="@color/overlay_bottom_nav"
         android:elevation="8dp">
 
         <LinearLayout
@@ -631,13 +631,13 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_search"
-                android:tint="#FFFFFF" />
+                android:tint="@color/icon_high" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Search"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_high"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
 
@@ -657,13 +657,13 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_home"
-                android:tint="#FFFFFF" />
+                android:tint="@color/icon_high" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Home"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_high"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
 
@@ -683,13 +683,13 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_playlist"
-                android:tint="#FFFFFF" />
+                android:tint="@color/icon_high" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Library"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_high"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
 
@@ -702,7 +702,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#020503"
+        android:background="@color/bg_deep"
         android:elevation="32dp"
         android:visibility="gone">
 
@@ -726,7 +726,7 @@
                     android:layout_height="4dp"
                     android:layout_gravity="center_horizontal"
                     android:layout_marginBottom="20dp"
-                    android:background="#40FFFFFF"
+                    android:background="@color/text_faint"
                     android:outlineProvider="background"
                     android:clipToOutline="true" />
 
@@ -768,7 +768,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Vibe Check"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_high"
                         android:textSize="22sp"
                         android:fontFamily="sans-serif-medium"
                         android:letterSpacing="-0.02"
@@ -782,7 +782,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="Ready to load…"
-                        android:textColor="#80FFFFFF"
+                        android:textColor="@color/text_low"
                         android:textSize="13sp"
                         android:maxLines="1"
                         android:ellipsize="end"
@@ -812,7 +812,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="0:00"
-                                android:textColor="#80FFFFFF"
+                                android:textColor="@color/text_low"
                                 android:textSize="11sp"
                                 android:fontFamily="monospace" />
 
@@ -826,7 +826,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="0:00"
-                                android:textColor="#80FFFFFF"
+                                android:textColor="@color/text_low"
                                 android:textSize="11sp"
                                 android:fontFamily="monospace"
                                 android:gravity="end" />
@@ -839,7 +839,7 @@
                             android:layout_gravity="center_vertical|end"
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:src="@drawable/ic_download"
-                            android:tint="#00FFA2"
+                            android:tint="@color/accent"
                             android:visibility="gone"
                             android:contentDescription="Download current track" />
                     </FrameLayout>
@@ -869,7 +869,7 @@
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_playlist"
-                        android:tint="#60FFFFFF"
+                        android:tint="@color/icon_faint"
                         android:layout_marginEnd="16dp"
                         android:contentDescription="Queue" />
 
@@ -879,7 +879,7 @@
                         android:layout_height="48dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_skip_prev"
-                        android:tint="#FFFFFF"
+                        android:tint="@color/icon_high"
                         android:layout_marginEnd="8dp"
                         android:contentDescription="Previous" />
 
@@ -898,7 +898,7 @@
                             android:layout_height="32dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_play"
-                            android:tint="#020503"
+                            android:tint="@color/bg_deep"
                             android:contentDescription="Play" />
 
                         <ImageView
@@ -907,7 +907,7 @@
                             android:layout_height="32dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_pause"
-                            android:tint="#020503"
+                            android:tint="@color/bg_deep"
                             android:visibility="gone"
                             android:contentDescription="Pause" />
                     </FrameLayout>
@@ -918,7 +918,7 @@
                         android:layout_height="48dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_skip_next"
-                        android:tint="#FFFFFF"
+                        android:tint="@color/icon_high"
                         android:layout_marginStart="8dp"
                         android:contentDescription="Next" />
 
@@ -928,7 +928,7 @@
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_repeat"
-                        android:tint="#60FFFFFF"
+                        android:tint="@color/icon_faint"
                         android:layout_marginStart="16dp"
                         android:contentDescription="Repeat" />
 
@@ -938,7 +938,7 @@
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_lyrics"
-                        android:tint="#80FFFFFF"
+                        android:tint="@color/icon_dim"
                         android:alpha="0.5"
                         android:contentDescription="Lyrics" />
 
@@ -948,7 +948,7 @@
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_thumb_down"
-                        android:tint="#60FFFFFF"
+                        android:tint="@color/icon_faint"
                         android:visibility="gone"
                         android:layout_marginStart="8dp"
                         android:contentDescription="Dislike" />
@@ -959,7 +959,7 @@
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_thumb_up"
-                        android:tint="#60FFFFFF"
+                        android:tint="@color/icon_faint"
                         android:visibility="gone"
                         android:layout_marginStart="4dp"
                         android:contentDescription="Like" />
@@ -997,7 +997,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Up Next"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.05" />
@@ -1007,7 +1007,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="CLEAR"
-                    android:textColor="#60FFFFFF"
+                    android:textColor="@color/text_dim"
                     android:textSize="10sp"
                     android:letterSpacing="0.1"
                     android:padding="8dp"
@@ -1029,7 +1029,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_close"
-                    android:tint="#80FFFFFF"
+                    android:tint="@color/icon_dim"
                     android:contentDescription="Close" />
             </LinearLayout>
 
@@ -1071,7 +1071,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Results"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.05" />
@@ -1082,7 +1082,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_close"
-                    android:tint="#80FFFFFF"
+                    android:tint="@color/icon_dim"
                     android:contentDescription="Close" />
             </LinearLayout>
 
@@ -1092,7 +1092,7 @@
                 android:layout_height="24dp"
                 android:layout_gravity="center_horizontal"
                 android:indeterminate="true"
-                android:indeterminateTint="#00FFA2"
+                android:indeterminateTint="@color/accent"
                 android:visibility="gone"
                 android:layout_marginBottom="8dp" />
 
@@ -1143,7 +1143,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="SETTINGS"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_high"
                         android:textSize="12sp"
                         android:letterSpacing="0.15"
                         android:fontFamily="sans-serif-medium" />
@@ -1154,7 +1154,7 @@
                         android:layout_height="36dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_close"
-                        android:tint="#80FFFFFF"
+                        android:tint="@color/icon_dim"
                         android:contentDescription="Close settings" />
                 </LinearLayout>
 
@@ -1162,7 +1162,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="EQUALIZER"
-                    android:textColor="#60FFFFFF"
+                    android:textColor="@color/text_dim"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1184,10 +1184,10 @@
                         android:layout_height="wrap_content" 
                         android:orientation="horizontal" 
                         android:layout_marginBottom="4dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Lows" android:textColor="#CCFFFFFF" android:textSize="12sp" />
-                        <TextView android:id="@+id/eqLowVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Lows" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                        <TextView android:id="@+id/eqLowVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="@color/accent" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
-                    <SeekBar android:id="@+id/eqLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
+                    <SeekBar android:id="@+id/eqLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="@color/accent" android:thumbTint="@color/accent" />
                 </LinearLayout>
 
                 <LinearLayout 
@@ -1200,10 +1200,10 @@
                         android:layout_height="wrap_content" 
                         android:orientation="horizontal" 
                         android:layout_marginBottom="4dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Mids" android:textColor="#CCFFFFFF" android:textSize="12sp" />
-                        <TextView android:id="@+id/eqMidVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Mids" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                        <TextView android:id="@+id/eqMidVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="@color/accent" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
-                    <SeekBar android:id="@+id/eqMid" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
+                    <SeekBar android:id="@+id/eqMid" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="@color/accent" android:thumbTint="@color/accent" />
                 </LinearLayout>
 
                 <LinearLayout 
@@ -1216,17 +1216,17 @@
                         android:layout_height="wrap_content" 
                         android:orientation="horizontal" 
                         android:layout_marginBottom="4dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Highs" android:textColor="#CCFFFFFF" android:textSize="12sp" />
-                        <TextView android:id="@+id/eqHighVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Highs" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                        <TextView android:id="@+id/eqHighVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="@color/accent" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
-                    <SeekBar android:id="@+id/eqHigh" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
+                    <SeekBar android:id="@+id/eqHigh" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="@color/accent" android:thumbTint="@color/accent" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="SLEEP TIMER"
-                    android:textColor="#60FFFFFF"
+                    android:textColor="@color/text_dim"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1242,7 +1242,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="THEME"
-                    android:textColor="#60FFFFFF"
+                    android:textColor="@color/text_dim"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1258,7 +1258,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="ACCOUNT"
-                    android:textColor="#60FFFFFF"
+                    android:textColor="@color/text_dim"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1273,7 +1273,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Connect your YouTube Music account for personalised recommendations."
-                        android:textColor="#80FFFFFF"
+                        android:textColor="@color/text_low"
                         android:textSize="12sp"
                         android:layout_marginBottom="12dp" />
                     <Button
@@ -1295,7 +1295,7 @@
                         android:id="@+id/accountNameText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_high"
                         android:textSize="14sp"
                         android:fontFamily="sans-serif-medium"
                         android:layout_marginBottom="2dp" />
@@ -1303,7 +1303,7 @@
                         android:id="@+id/accountEmailText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textColor="#80FFFFFF"
+                        android:textColor="@color/text_low"
                         android:textSize="12sp"
                         android:layout_marginBottom="12dp" />
                     <Button
@@ -1321,7 +1321,7 @@
         android:id="@+id/scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#000000"
+        android:background="@color/scrim"
         android:alpha="0"
         android:visibility="gone"
         android:clickable="true"
@@ -1332,7 +1332,7 @@
         android:id="@+id/lyricsSheet"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#FF0A0A0A"
+        android:background="@color/surface_elevated"
         android:visibility="gone"
         android:elevation="44dp">
 
@@ -1344,7 +1344,7 @@
             android:layout_marginTop="16dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_arrow_back"
-            android:tint="#99FFFFFF"
+            android:tint="@color/icon_muted"
             android:contentDescription="Close lyrics"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -1357,7 +1357,7 @@
             android:layout_marginEnd="64dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#80FFFFFF"
+            android:textColor="@color/text_low"
             android:textSize="13sp"
             app:layout_constraintBottom_toBottomOf="@id/lyricsBackBtn"
             app:layout_constraintEnd_toEndOf="parent"
@@ -1418,7 +1418,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text=""
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_high"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
@@ -1431,7 +1431,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_close"
-                    android:tint="#80FFFFFF"
+                    android:tint="@color/icon_dim"
                     android:contentDescription="Close" />
             </LinearLayout>
 
@@ -1441,7 +1441,7 @@
                 android:layout_height="24dp"
                 android:layout_gravity="center_horizontal"
                 android:indeterminate="true"
-                android:indeterminateTint="#00FFA2"
+                android:indeterminateTint="@color/accent"
                 android:visibility="gone"
                 android:layout_marginBottom="8dp" />
 
