@@ -15,7 +15,7 @@ class TrackAdapter(
     private val onTrackClick: (Int) -> Unit
 ) : RecyclerView.Adapter<TrackAdapter.VH>() {
 
-    var accentColor: Int = 0xFF00E676.toInt()
+    var accentColor: Int = 0xFF00FFA2.toInt()
     private var nowPlayingIndex = -1
     var itemTouchHelper: ItemTouchHelper? = null
 
@@ -51,6 +51,7 @@ class TrackAdapter(
 
         val isNowPlaying = pos == nowPlayingIndex
         h.nowPlaying.visibility = if (isNowPlaying) View.VISIBLE else View.INVISIBLE
+        h.nowPlaying.setBackgroundColor(accentColor)
         h.title.setTextColor(if (isNowPlaying) accentColor else Color.WHITE)
 
         h.itemView.setOnClickListener { onTrackClick(h.adapterPosition) }
