@@ -446,16 +446,21 @@
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/newPlaylistBtn"
                         android:layout_width="wrap_content"
                         android:layout_height="32dp"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
+                        android:paddingHorizontal="12dp"
+                        android:gravity="center"
                         android:text="+ New"
                         android:textSize="12sp"
+                        android:fontFamily="sans-serif-medium"
                         android:textColor="@color/accent"
-                        android:backgroundTint="@android:color/transparent" />
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true" />
 
                 </RelativeLayout>
 
@@ -488,13 +493,14 @@
                 android:paddingHorizontal="8dp"
                 android:paddingBottom="4dp">
 
-                <Button
+                <ImageButton
                     android:id="@+id/backFromPlaylistBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="← Back"
-                    android:textColor="@color/text_high"
-                    android:backgroundTint="@android:color/transparent" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_arrow_back"
+                    android:tint="@color/icon_muted"
+                    android:contentDescription="Back to playlists" />
 
                 <TextView
                     android:id="@+id/playlistDetailTitle"
@@ -682,7 +688,7 @@
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_playlist"
+                android:src="@drawable/ic_library"
                 android:tint="@color/icon_high" />
 
             <TextView
@@ -1276,12 +1282,18 @@
                         android:textColor="@color/text_low"
                         android:textSize="12sp"
                         android:layout_marginBottom="12dp" />
-                    <Button
+                    <TextView
                         android:id="@+id/connectAccountBtn"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="44dp"
+                        android:gravity="center"
                         android:text="Sign in with Google"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/text_on_accent"
+                        android:background="@drawable/bg_button_filled"
+                        android:clickable="true"
+                        android:focusable="true" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1306,12 +1318,18 @@
                         android:textColor="@color/text_low"
                         android:textSize="12sp"
                         android:layout_marginBottom="12dp" />
-                    <Button
+                    <TextView
                         android:id="@+id/signOutBtn"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="44dp"
+                        android:gravity="center"
                         android:text="Sign out"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent"
+                        android:background="@drawable/bg_button_outline"
+                        android:clickable="true"
+                        android:focusable="true" />
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>
