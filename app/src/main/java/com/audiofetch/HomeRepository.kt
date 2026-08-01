@@ -32,6 +32,18 @@ object HomeRepository {
     }
 }
 
+    /** The signed-in user's saved/liked albums from their YouTube Music library. */
+    suspend fun getLibraryAlbums(context: Context): List<HomeCard> {
+        if (!AccountManager.isAuthenticated(context)) return emptyList()
+        val cookies = AccountManager.getCookies(context)
+        return try {
+            val response = InnerTubeClient.getLibraryAlbums(cookies)
+            InnerTubeParser.parseLibraryAlbums(response)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     suspend fun getWatchNext(videoId: String, context: Context): List<HomeCard> {
         val cookies = if (AccountManager.isAuthenticated(context)) loadSavedCookies(context) else null
         return try {
