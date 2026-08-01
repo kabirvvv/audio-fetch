@@ -69,6 +69,9 @@ class MainActivity : AppCompatActivity() {
     // ── Full player state ─────────────────────────────────────────────────────
     private var fullPlayerVisible = false
 
+    // ── Album page state ──────────────────────────────────────────────────────
+    private var albumPageVisible = false
+
     // ── Playback ──────────────────────────────────────────────────────────────
     private var autoplayEnabled = false
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -114,6 +117,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private lateinit var recentlyPlayedAdapter: HomeCardAdapter
+    private lateinit var libraryAlbumsAdapter: HomeCardAdapter
     private lateinit var playlistBrowseAdapter: SearchResultsAdapter
     private lateinit var trackAdapter: TrackAdapter
     private lateinit var libraryAdapter: LibraryAdapter
@@ -176,6 +180,7 @@ class MainActivity : AppCompatActivity() {
         when {
             fullPlayerVisible -> hideFullPlayer()
             lyricsVisible     -> hideLyrics()
+            albumPageVisible  -> hideAlbumPage()
             else              -> super.onBackPressed()
         }
     }
@@ -448,6 +453,12 @@ class MainActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
             adapter = recentlyPlayedAdapter
         }
+
+        libraryAlbumsAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
+        binding.libraryAlbumsRecycler.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
+            adapter = libraryAlbumsAdapter
+        }
     }
 
     private fun loadHomeData() {
@@ -479,6 +490,16 @@ class MainActivity : AppCompatActivity() {
 
         val seedId = tracks.getOrNull(currentIndex)?.videoId ?: ""
 
+        if (AccountManager.isAuthenticated(this)) {
+            lifecycleScope.launch {
+                val libAlbums = HomeRepository.getLibraryAlbums(this@MainActivity)
+                binding.libraryAlbumsSection.isVisible = libAlbums.isNotEmpty()
+                if (libAlbums.isNotEmpty()) libraryAlbumsAdapter.submitList(libAlbums)
+            }
+        } else {
+            binding.libraryAlbumsSection.isVisible = false
+        }
+
         lifecycleScope.launch {
             val shelves = fetchOnlineShelves(seedId)
             hideShimmer()
@@ -490,6 +511,15 @@ class MainActivity : AppCompatActivity() {
     private fun renderShelves(shelves: List<HomeShelf>) {
         homeDataCache = shelves
         binding.homeShelvesContainer.removeAllViews()
+
+        // Dedicated "Albums" row, pooled from every fetched shelf so albums don't
+        // get buried inside mixed Quick Picks / Mixed For You style carousels.
+        val albumCards = shelves.flatMap { it.items }
+            .filter { it.type == HomeCardType.ALBUM }
+            .distinctBy { it.playlistId ?: it.title }
+        if (albumCards.isNotEmpty()) {
+            buildShelfRow(binding.homeShelvesContainer, HomeShelf("Albums", albumCards.take(15)))
+        }
 
         shelves.forEach { shelf -> buildShelfRow(binding.homeShelvesContainer, shelf) }
     }
@@ -874,11 +904,11 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     // ALBUM PAGE
     // ─────────────────────────────────────────────
 
-    private lateinit var albumPageAdapter: SearchResultsAdapter
+    private lateinit var albumPageAdapter: AlbumTrackAdapter
     private var currentAlbumDetails: AlbumDetails? = null
 
     private fun setupAlbumPage() {
-        albumPageAdapter = SearchResultsAdapter(emptyList()) { result ->
+        albumPageAdapter = AlbumTrackAdapter(emptyList()) { result ->
             streamFromSearchResult(result)
         }
         binding.albumPageTrackList.apply {
@@ -900,6 +930,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     }
 
     private fun showAlbumPage(browseId: String, fallbackTitle: String, fallbackArtist: String, fallbackThumbnail: String) {
+        albumPageVisible = true
         currentAlbumDetails = null
         binding.albumPageTitle.text = fallbackTitle
         binding.albumPageArtist.text = fallbackArtist
@@ -954,6 +985,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     }
 
     private fun hideAlbumPage() {
+        albumPageVisible = false
         binding.albumPage.animate().alpha(0f).setDuration(200).withEndAction {
             binding.albumPage.visibility = View.GONE
         }.start()
@@ -973,9 +1005,6 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             .load(url.ifBlank { null })
             .placeholder(R.drawable.bg_album_art_default)
             .error(R.drawable.bg_album_art_default)
-            .apply(com.bumptech.glide.request.RequestOptions()
-                .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(
-                    (12 * resources.displayMetrics.density).toInt())))
             .into(binding.albumPageArt)
 
         binding.albumPageBgArt.scaleX = 1.4f
@@ -1031,6 +1060,8 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
                     if (!started) {
                         binding.albumPageProgress.isVisible = false
                         loadTrack(tracks.size - 1)
+                        showMiniPlayer()
+                        showFullPlayer()
                         started = true
                     } else {
                         player?.addMediaItem(MediaItem.fromUri(track.uri))
@@ -1084,14 +1115,14 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         container.addView(rv)
     }
 
-    /** Empty-query state: reuse the already-fetched Home shelves as search recommendations. */
+    /** Empty-query state: the search page stays blank until the user actually searches. */
     private fun showSearchRecommendations() {
-        binding.searchSectionsLabel.text = "Search recommendations"
-        binding.searchSectionsLabel.isVisible = homeDataCache.isNotEmpty()
+        binding.searchSectionsLabel.isVisible = false
         binding.searchSongsLabel.isVisible = false
         binding.searchShelvesContainer.removeAllViews()
         binding.searchSongsRecycler.isVisible = false
-        homeDataCache.take(4).forEach { shelf -> buildShelfRow(binding.searchShelvesContainer, shelf) }
+        searchResultsAdapter.update(emptyList())
+        binding.statusText.text = ""
     }
 
     /** Renders categorized search results: Albums / Singles shelves + a vertical Songs list. */
