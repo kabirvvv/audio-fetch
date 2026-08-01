@@ -149,14 +149,6 @@
                     android:fontFamily="sans-serif-medium"
                     android:visibility="gone" />
 
-                <!-- Albums / Singles shelves get injected here at runtime, same
-                     mechanism as homeShelvesContainer on the Home tab. -->
-                <LinearLayout
-                    android:id="@+id/searchShelvesContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
                 <TextView
                     android:id="@+id/searchSongsLabel"
                     android:layout_width="match_parent"
@@ -177,6 +169,14 @@
                     android:nestedScrollingEnabled="false"
                     android:overScrollMode="never"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+                <!-- Albums / Singles shelves get injected here at runtime, same
+                     mechanism as homeShelvesContainer on the Home tab. -->
+                <LinearLayout
+                    android:id="@+id/searchShelvesContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
@@ -231,6 +231,37 @@
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recentlyPlayedRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="20dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/libraryAlbumsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="20dp"
+                    android:paddingBottom="10dp"
+                    android:text="Your Albums"
+                    android:textColor="@color/text_high"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/libraryAlbumsRecycler"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
@@ -1535,15 +1566,24 @@
                 android:paddingTop="72dp"
                 android:paddingHorizontal="32dp">
 
-                <ImageView
-                    android:id="@+id/albumPageArt"
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="220dp"
                     android:layout_height="220dp"
-                    android:scaleType="centerCrop"
-                    android:background="@drawable/bg_album_art_default"
-                    android:elevation="12dp"
                     android:layout_marginBottom="20dp"
-                    android:contentDescription="Album art" />
+                    app:cardCornerRadius="18dp"
+                    app:cardElevation="14dp"
+                    app:strokeWidth="0dp"
+                    app:cardBackgroundColor="@color/bg_deep">
+
+                    <ImageView
+                        android:id="@+id/albumPageArt"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:background="@drawable/bg_album_art_default"
+                        android:contentDescription="Album art" />
+
+                </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:id="@+id/albumPageTitle"
@@ -1587,16 +1627,16 @@
 
                     <FrameLayout
                         android:id="@+id/albumPagePlayBtn"
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
-                        android:background="@drawable/bg_play_button"
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:background="@drawable/bg_play_button_soft"
                         android:clickable="true"
                         android:focusable="true">
 
                         <ImageView
                             android:id="@+id/albumPagePlayIcon"
-                            android:layout_width="26dp"
-                            android:layout_height="26dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_play"
                             android:tint="@color/bg_deep"
@@ -1604,8 +1644,8 @@
 
                         <ImageView
                             android:id="@+id/albumPagePauseIcon"
-                            android:layout_width="26dp"
-                            android:layout_height="26dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_pause"
                             android:tint="@color/bg_deep"
