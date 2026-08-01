@@ -18,7 +18,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingBottom="120dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -121,6 +120,67 @@
                 android:gravity="center"
                 android:letterSpacing="0.05" />
         </LinearLayout>
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/searchResultsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:clipToPadding="false"
+            android:paddingBottom="120dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="8dp">
+
+                <TextView
+                    android:id="@+id/searchSectionsLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="20dp"
+                    android:paddingBottom="4dp"
+                    android:text="Search recommendations"
+                    android:textColor="@color/text_high"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:visibility="gone" />
+
+                <!-- Albums / Singles shelves get injected here at runtime, same
+                     mechanism as homeShelvesContainer on the Home tab. -->
+                <LinearLayout
+                    android:id="@+id/searchShelvesContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/searchSongsLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="20dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="10dp"
+                    android:text="Songs"
+                    android:textColor="@color/text_high"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:visibility="gone" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/searchSongsRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:overScrollMode="never"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
 
     </LinearLayout>
 
@@ -1050,72 +1110,6 @@
     </FrameLayout>
 
     <FrameLayout
-        android:id="@+id/searchSheet"
-        android:layout_width="match_parent"
-        android:layout_height="520dp"
-        android:layout_gravity="bottom"
-        android:background="@drawable/bg_bottom_sheet"
-        android:translationY="999dp"
-        android:elevation="36dp"
-        android:padding="24dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
-
-                <TextView
-                    android:id="@+id/searchSheetTitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Results"
-                    android:textColor="@color/text_high"
-                    android:textSize="16sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="0.05" />
-
-                <ImageButton
-                    android:id="@+id/closeSearchSheetBtn"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_close"
-                    android:tint="@color/icon_dim"
-                    android:contentDescription="Close" />
-            </LinearLayout>
-
-            <ProgressBar
-                android:id="@+id/searchSheetProgress"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="center_horizontal"
-                android:indeterminate="true"
-                android:indeterminateTint="@color/accent"
-                android:visibility="gone"
-                android:layout_marginBottom="8dp" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/searchResultsRecycler"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:scrollbars="none"
-                android:overScrollMode="never"
-                android:clipToPadding="false"
-                android:paddingBottom="8dp" />
-
-        </LinearLayout>
-    </FrameLayout>
-
-    <FrameLayout
         android:id="@+id/settingsPanel"
         android:layout_width="300dp"
         android:layout_height="match_parent"
@@ -1475,5 +1469,191 @@
 
         </LinearLayout>
     </FrameLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/albumPage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/bg_deep"
+        android:visibility="gone"
+        android:elevation="20dp">
+
+        <!-- Experimental: blurred, zoomed-in album art behind the real cover.
+             Blur only applies on API 31+ (RenderEffect); older devices just get
+             the dimmed/zoomed image with no blur. Easy to rip out later. -->
+        <ImageView
+            android:id="@+id/albumPageBgArt"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="centerCrop"
+            android:alpha="0.45"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@color/scrim"
+            android:alpha="0.4"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <ImageButton
+            android:id="@+id/albumPageBackBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="16dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            android:tint="@color/icon_high"
+            android:contentDescription="Back"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:clipToPadding="false"
+            android:paddingBottom="140dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:paddingTop="72dp"
+                android:paddingHorizontal="32dp">
+
+                <ImageView
+                    android:id="@+id/albumPageArt"
+                    android:layout_width="220dp"
+                    android:layout_height="220dp"
+                    android:scaleType="centerCrop"
+                    android:background="@drawable/bg_album_art_default"
+                    android:elevation="12dp"
+                    android:layout_marginBottom="20dp"
+                    android:contentDescription="Album art" />
+
+                <TextView
+                    android:id="@+id/albumPageTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:textColor="@color/text_high"
+                    android:textSize="20sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/albumPageArtist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:textColor="@color/text_low"
+                    android:textSize="14sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="24dp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="20dp">
+
+                    <ImageButton
+                        android:id="@+id/albumPageShuffleBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_shuffle"
+                        android:tint="@color/icon_faint"
+                        android:layout_marginEnd="20dp"
+                        android:contentDescription="Shuffle" />
+
+                    <FrameLayout
+                        android:id="@+id/albumPagePlayBtn"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:background="@drawable/bg_play_button"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:id="@+id/albumPagePlayIcon"
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_play"
+                            android:tint="@color/bg_deep"
+                            android:contentDescription="Play" />
+
+                        <ImageView
+                            android:id="@+id/albumPagePauseIcon"
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_pause"
+                            android:tint="@color/bg_deep"
+                            android:visibility="gone"
+                            android:contentDescription="Pause" />
+                    </FrameLayout>
+
+                    <ImageButton
+                        android:id="@+id/albumPageRepeatBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_repeat"
+                        android:tint="@color/icon_faint"
+                        android:layout_marginStart="20dp"
+                        android:contentDescription="Repeat" />
+
+                    <ImageButton
+                        android:id="@+id/albumPageLikeBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_thumb_up"
+                        android:tint="@color/icon_faint"
+                        android:layout_marginStart="20dp"
+                        android:contentDescription="Like" />
+                </LinearLayout>
+
+                <ProgressBar
+                    android:id="@+id/albumPageProgress"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:indeterminate="true"
+                    android:indeterminateTint="@color/accent"
+                    android:visibility="gone"
+                    android:layout_marginBottom="12dp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/albumPageTrackList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:overScrollMode="never"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
