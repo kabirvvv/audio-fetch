@@ -578,6 +578,128 @@ def get_watch_playlist(video_id: str, limit: int = 10) -> str:
     except Exception as e:
         return f"ERROR: {str(e)}"
         
+def search_all(query: str, limit: int = 20) -> str:
+    """Search YouTube Music and split results into songs / albums / singles.
+
+    Runs two ytmusicapi searches in parallel:
+      - filter="songs"  → songs list
+      - filter="albums" → split by item["type"] into albums vs singles/EPs
+
+    Returns JSON: {"songs": [...], "albums": [...], "singles": [...]}
+    Each item matches the existing HomeCard / SearchResult shape so the
+    Kotlin side can reuse HomeCardAdapter / SearchResultAdapter as-is.
+    """
+    query = query.strip()
+    if not query:
+        return "ERROR: empty query"
+    if _ytmusic is None:
+        return "ERROR: ytmusicapi unavailable"
+
+    result = {"songs": [], "albums": [], "singles": []}
+    lock = threading.Lock()
+
+    def fetch_songs():
+        try:
+            raw = _ytmusic.search(query, filter="songs", limit=limit)
+            songs = []
+            for item in raw[:limit]:
+                vid = item.get("videoId", "")
+                if not vid:
+                    continue
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                duration_secs = item.get("duration_seconds") or 0
+                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+                songs.append({
+                    "videoId": vid,
+                    "title": item.get("title", "Unknown"),
+                    "artist": artist,
+                    "duration": item.get("duration") or _format_duration(duration_secs),
+                    "durationSeconds": duration_secs,
+                    "thumbnail": thumbnail,
+                    "webpage_url": f"https://music.youtube.com/watch?v={vid}",
+                })
+            with lock:
+                result["songs"] = songs
+        except Exception:
+            pass
+
+    def fetch_albums():
+        try:
+            raw = _ytmusic.search(query, filter="albums", limit=limit)
+            albums, singles = [], []
+            for item in raw[:limit]:
+                browse_id = item.get("browseId", "")
+                if not browse_id:
+                    continue
+                artists = item.get("artists") or []
+                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+                card = _card("", item.get("title", "Unknown"), artist, thumbnail,
+                             card_type="ALBUM", playlist_id=browse_id)
+                if (item.get("type") or "").lower() == "single":
+                    singles.append(card)
+                else:
+                    albums.append(card)
+            with lock:
+                result["albums"] = albums
+                result["singles"] = singles
+        except Exception:
+            pass
+
+    threads = [threading.Thread(target=fetch_songs), threading.Thread(target=fetch_albums)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=15)
+
+    return json.dumps(result)
+
+
+def get_album_details(browse_id: str, limit: int = 100) -> str:
+    """Fetch full album metadata plus its track list, for the Album Page.
+
+    Returns JSON: {title, artist, thumbnail, year, tracks: [SearchResult dicts]}
+    """
+    if not browse_id or _ytmusic is None:
+        return "ERROR: ytmusicapi unavailable"
+    try:
+        raw = _ytmusic.get_album(browse_id)
+        title = raw.get("title", "Unknown Album")
+        artists = raw.get("artists") or []
+        artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+        thumbnail = _best_thumbnail(raw.get("thumbnails") or [])
+        year = raw.get("year", "")
+
+        tracks = []
+        for item in (raw.get("tracks") or [])[:limit]:
+            vid = item.get("videoId", "")
+            if not vid:
+                continue
+            t_artists = item.get("artists") or []
+            t_artist = ", ".join(a.get("name", "") for a in t_artists if a.get("name")) or artist
+            duration_secs = item.get("duration_seconds") or 0
+            tracks.append({
+                "videoId": vid,
+                "title": item.get("title", "Unknown"),
+                "artist": t_artist,
+                "duration": _format_duration(duration_secs),
+                "durationSeconds": duration_secs,
+                "thumbnail": thumbnail,
+                "webpage_url": f"https://music.youtube.com/watch?v={vid}",
+            })
+
+        return json.dumps({
+            "title": title,
+            "artist": artist,
+            "thumbnail": thumbnail,
+            "year": year,
+            "tracks": tracks,
+        })
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+
 def get_playlist_tracks(browse_id: str, limit: int = 50) -> str:
     """Fetch tracks for an album or playlist by browseId or playlistId.
 
@@ -688,92 +810,4 @@ def setup_account(cookie_string: str) -> str:
     except Exception as e:
         # Clean up bad auth file
         try:
-            os.remove(_AUTH_PATH)
-        except Exception:
-            pass
-        _ytmusic_authed = None
-        return f"ERROR: {str(e)}"
-
-
-def get_account_info() -> str:
-    """Return cached account info if authenticated.
-
-    Returns JSON: {"authenticated": bool, "name": "...", "email": "..."}
-    """
-    global _ytmusic_authed
-
-    if not os.path.exists(_AUTH_PATH):
-        return json.dumps({"authenticated": False, "name": "", "email": ""})
-
-    try:
-        if _ytmusic_authed is None:
-            _ytmusic_authed = YTMusic(_AUTH_PATH)
-        info = _ytmusic_authed.get_account_info()
-        name  = info.get("accountName") or info.get("name") or "YouTube Music user"
-        email = info.get("accountEmail") or info.get("email") or ""
-        return json.dumps({"authenticated": True, "name": name, "email": email})
-    except Exception:
-        _ytmusic_authed = None
-        return json.dumps({"authenticated": False, "name": "", "email": ""})
-
-
-def sign_out() -> str:
-    """Delete auth file and clear the authenticated instance."""
-    global _ytmusic_authed
-    _ytmusic_authed = None
-    try:
-        if os.path.exists(_AUTH_PATH):
-            os.remove(_AUTH_PATH)
-    except Exception as e:
-        return f"ERROR: {str(e)}"
-    return json.dumps({"success": True})
-
-
-def rate_song(video_id: str, rating: str) -> str:
-    """Rate a song. rating must be LIKE, DISLIKE, or INDIFFERENT.
-
-    Returns JSON: {"success": true} or "ERROR: ..."
-    """
-    yt = _get_authed()
-    if yt is None:
-        return "ERROR: not authenticated"
-    if rating not in ("LIKE", "DISLIKE", "INDIFFERENT"):
-        return "ERROR: invalid rating"
-    try:
-        yt.rate_song(video_id, rating)
-        return json.dumps({"success": True})
-    except Exception as e:
-        return f"ERROR: {str(e)}"
-
-
-def get_liked_songs(limit: int = 100) -> str:
-    """Fetch the user's liked songs playlist.
-
-    Returns JSON array of SearchResult-compatible dicts.
-    """
-    yt = _get_authed()
-    if yt is None:
-        return "ERROR: not authenticated"
-    try:
-        raw = yt.get_liked_songs(limit=limit)
-        results = []
-        for item in (raw.get("tracks") or []):
-            vid = item.get("videoId", "")
-            if not vid:
-                continue
-            artists = item.get("artists") or []
-            artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
-            duration_secs = item.get("duration_seconds") or 0
-            thumbnail = _best_thumbnail(item.get("thumbnails") or [])
-            results.append({
-                "videoId":         vid,
-                "title":           item.get("title", "Unknown"),
-                "artist":          artist,
-                "duration":        _format_duration(duration_secs),
-                "durationSeconds": duration_secs,
-                "thumbnail":       thumbnail,
-                "webpage_url":     f"https://music.youtube.com/watch?v={vid}",
-            })
-        return json.dumps(results)
-    except Exception as e:
-        return f"ERROR: {str(e)}"
+ 
