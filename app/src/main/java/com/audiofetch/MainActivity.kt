@@ -46,6 +46,8 @@ import com.chaquo.python.android.AndroidPlatform
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -223,16 +225,14 @@ class MainActivity : AppCompatActivity() {
             adapter = playlistsAdapter
         }
 
-        // ── Search results ────────────────────────────────────────────────────
+        // ── Search results (songs list, shown inline on the search page) ───────
         searchResultsAdapter = SearchResultsAdapter(emptyList()) { result ->
-            hideSearchSheet()
             streamFromSearchResult(result)
         }
-        binding.searchResultsRecycler.apply {
+        binding.searchSongsRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = searchResultsAdapter
         }
-        binding.closeSearchSheetBtn.setOnClickListener { hideSearchSheet() }
 
         // ── Library tabs ──────────────────────────────────────────────────────
         binding.libTabDownloads.setOnClickListener { selectLibraryTab(0) }
@@ -279,6 +279,14 @@ class MainActivity : AppCompatActivity() {
         binding.urlInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) { startStream(); true } else false
         }
+        binding.urlInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (currentTab != Tab.SEARCH) return
+                scheduleLiveSearch(s?.toString()?.trim() ?: "")
+            }
+        })
         binding.downloadBtn.isVisible = false
         binding.downloadBtn.setOnClickListener { downloadCurrentStream() }
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
@@ -317,7 +325,6 @@ class MainActivity : AppCompatActivity() {
         binding.scrim.setOnClickListener {
             hideQueueSheet()
             hideSettings()
-            hideSearchSheet()
             hidePlaylistBrowseSheet()
         }
 
@@ -339,6 +346,7 @@ class MainActivity : AppCompatActivity() {
         selectLibraryTab(0)
         setupHomeAdapters()
         setupPlaylistBrowseSheet()
+        setupAlbumPage()
         switchTab(Tab.HOME)
     }
 
@@ -362,6 +370,9 @@ class MainActivity : AppCompatActivity() {
             val stale = System.currentTimeMillis() - homeCacheTime > 30 * 60 * 1000L
             if (homeDataCache.isEmpty() || stale) loadHomeData()
             else renderShelves(homeDataCache)
+        }
+        if (tab == Tab.SEARCH && binding.urlInput.text.isNullOrBlank()) {
+            showSearchRecommendations()
         }
     }
 
@@ -480,40 +491,7 @@ class MainActivity : AppCompatActivity() {
         homeDataCache = shelves
         binding.homeShelvesContainer.removeAllViews()
 
-        shelves.forEach { shelf ->
-            if (shelf.items.isEmpty()) return@forEach
-
-            val header = TextView(this).apply {
-                text = shelf.title
-                textSize = 15f
-                setTextColor(0xFFFFFFFF.toInt())
-                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-                val px = (20 * resources.displayMetrics.density).toInt()
-                setPadding(px, 0, px, (10 * resources.displayMetrics.density).toInt())
-                layoutParams = ViewGroup.MarginLayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (4 * resources.displayMetrics.density).toInt() }
-            }
-
-            val rv = RecyclerView(this).apply {
-                layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
-                adapter = HomeCardAdapter { card -> onHomeCardClick(card) }
-                    .also { it.submitList(shelf.items) }
-                overScrollMode = View.OVER_SCROLL_NEVER
-                isNestedScrollingEnabled = false
-                val ph = (12 * resources.displayMetrics.density).toInt()
-                setPadding(ph, 0, ph, (20 * resources.displayMetrics.density).toInt())
-                clipToPadding = false
-                layoutParams = ViewGroup.MarginLayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            binding.homeShelvesContainer.addView(header)
-            binding.homeShelvesContainer.addView(rv)
-        }
+        shelves.forEach { shelf -> buildShelfRow(binding.homeShelvesContainer, shelf) }
     }
 
     private fun showShimmer() {
@@ -586,7 +564,11 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
                 if (card.videoId.isEmpty()) return
                 streamFromHomeCard(card)
             }
-            HomeCardType.ALBUM, HomeCardType.PLAYLIST -> {
+            HomeCardType.ALBUM -> {
+                val browseId = card.playlistId ?: return
+                showAlbumPage(browseId, card.title, card.artist, card.thumbnail)
+            }
+            HomeCardType.PLAYLIST -> {
                 val browseId = card.playlistId ?: return
                 showPlaylistBrowseSheet(card.title, browseId)
             }
@@ -889,28 +871,247 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     }
 
     // ─────────────────────────────────────────────
-    // SEARCH SHEET
+    // ALBUM PAGE
     // ─────────────────────────────────────────────
 
-    private fun showSearchSheet(searching: Boolean = false) {
-        binding.searchSheetProgress.isVisible = searching
-        binding.scrim.visibility = View.VISIBLE
-        binding.searchSheet.visibility = View.VISIBLE
-        binding.scrim.animate().alpha(0.6f).setDuration(300).start()
-        binding.searchSheet.animate()
-            .translationY(0f).setDuration(400)
-            .setInterpolator(DecelerateInterpolator(2f)).start()
+    private lateinit var albumPageAdapter: SearchResultsAdapter
+    private var currentAlbumDetails: AlbumDetails? = null
+
+    private fun setupAlbumPage() {
+        albumPageAdapter = SearchResultsAdapter(emptyList()) { result ->
+            streamFromSearchResult(result)
+        }
+        binding.albumPageTrackList.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = albumPageAdapter
+        }
+        binding.albumPageBackBtn.setOnClickListener { hideAlbumPage() }
+        binding.albumPagePlayBtn.setOnClickListener {
+            val details = currentAlbumDetails ?: return@setOnClickListener
+            if (player?.isPlaying == true && tracks.isNotEmpty()) togglePlayPause()
+            else playAlbumQueue(details, shuffle = false)
+        }
+        binding.albumPageShuffleBtn.setOnClickListener {
+            val details = currentAlbumDetails ?: return@setOnClickListener
+            playAlbumQueue(details, shuffle = true)
+        }
+        binding.albumPageRepeatBtn.setOnClickListener { cycleRepeat() }
+        binding.albumPageLikeBtn.setOnClickListener { rateCurrentTrack("LIKE") }
     }
 
-    private fun hideSearchSheet() {
-        binding.scrim.animate().alpha(0f).setDuration(200).withEndAction {
-            binding.scrim.visibility = View.GONE
+    private fun showAlbumPage(browseId: String, fallbackTitle: String, fallbackArtist: String, fallbackThumbnail: String) {
+        currentAlbumDetails = null
+        binding.albumPageTitle.text = fallbackTitle
+        binding.albumPageArtist.text = fallbackArtist
+        albumPageAdapter.update(emptyList())
+        loadAlbumArt(fallbackThumbnail)
+        binding.albumPageProgress.isVisible = true
+
+        binding.albumPage.visibility = View.VISIBLE
+        binding.albumPage.alpha = 0f
+        binding.albumPage.animate().alpha(1f).setDuration(250).start()
+
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    Python.getInstance().getModule("main")
+                        .callAttr("get_album_details", browseId).toString()
+                } catch (e: Exception) { "ERROR: ${e.message}" }
+            }
+            binding.albumPageProgress.isVisible = false
+
+            if (result.startsWith("ERROR")) {
+                setStatus(result, StatusType.ERROR)
+                return@launch
+            }
+            try {
+                val obj = JSONObject(result)
+                val tracksArr = obj.optJSONArray("tracks") ?: JSONArray()
+                val trackList = (0 until tracksArr.length()).map { i ->
+                    val o = tracksArr.getJSONObject(i)
+                    SearchResult(
+                        videoId         = o.optString("videoId"),
+                        title           = o.optString("title", "Unknown"),
+                        artist          = o.optString("artist", ""),
+                        duration        = o.optString("duration", ""),
+                        durationSeconds = o.optInt("durationSeconds", 0),
+                        thumbnail       = o.optString("thumbnail", ""),
+                        webpageUrl      = o.optString("webpage_url", ""),
+                    )
+                }
+                val details = AlbumDetails(
+                    title     = obj.optString("title", fallbackTitle),
+                    artist    = obj.optString("artist", fallbackArtist),
+                    thumbnail = obj.optString("thumbnail", fallbackThumbnail),
+                    year      = obj.optString("year", ""),
+                    tracks    = trackList
+                )
+                renderAlbumPage(details)
+            } catch (e: Exception) {
+                setStatus("ERROR: ${e.message}", StatusType.ERROR)
+            }
+        }
+    }
+
+    private fun hideAlbumPage() {
+        binding.albumPage.animate().alpha(0f).setDuration(200).withEndAction {
+            binding.albumPage.visibility = View.GONE
         }.start()
-        binding.searchSheet.animate()
-            .translationY(binding.searchSheet.height.toFloat() + 100f)
-            .setDuration(300).withEndAction {
-                binding.searchSheet.visibility = View.GONE
-            }.start()
+    }
+
+    private fun renderAlbumPage(details: AlbumDetails) {
+        currentAlbumDetails = details
+        binding.albumPageTitle.text = details.title
+        binding.albumPageArtist.text = details.artist
+        albumPageAdapter.update(details.tracks)
+        loadAlbumArt(details.thumbnail)
+    }
+
+    /** Loads the album art into both the centered cover and the experimental blurred/zoomed background. */
+    private fun loadAlbumArt(url: String) {
+        com.bumptech.glide.Glide.with(this)
+            .load(url.ifBlank { null })
+            .placeholder(R.drawable.bg_album_art_default)
+            .error(R.drawable.bg_album_art_default)
+            .apply(com.bumptech.glide.request.RequestOptions()
+                .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(
+                    (12 * resources.displayMetrics.density).toInt())))
+            .into(binding.albumPageArt)
+
+        binding.albumPageBgArt.scaleX = 1.4f
+        binding.albumPageBgArt.scaleY = 1.4f
+        com.bumptech.glide.Glide.with(this)
+            .load(url.ifBlank { null })
+            .placeholder(R.drawable.bg_album_art_default)
+            .error(R.drawable.bg_album_art_default)
+            .into(binding.albumPageBgArt)
+
+        // Experimental blur — API 31+ only, no-op (just the zoomed/dimmed image) below that.
+        if (Build.VERSION.SDK_INT >= 31) {
+            binding.albumPageBgArt.setRenderEffect(
+                android.graphics.RenderEffect.createBlurEffect(
+                    60f, 60f, android.graphics.Shader.TileMode.CLAMP
+                )
+            )
+        }
+    }
+
+    /** Resolves and queues every track in [details], starting playback as soon as the first is ready. */
+    private fun playAlbumQueue(details: AlbumDetails, shuffle: Boolean) {
+        val order = if (shuffle) details.tracks.shuffled() else details.tracks
+        if (order.isEmpty()) return
+
+        binding.albumPageProgress.isVisible = true
+        tracks.clear()
+        player?.clearMediaItems()
+
+        lifecycleScope.launch {
+            var started = false
+            for (result in order) {
+                if (result.videoId.isEmpty()) continue
+                val streamJson = withContext(Dispatchers.IO) {
+                    try {
+                        Python.getInstance().getModule("main")
+                            .callAttr("get_stream_url_by_id", result.videoId).toString()
+                    } catch (e: Exception) { "ERROR: ${e.message}" }
+                }
+                if (streamJson.startsWith("ERROR")) continue
+                try {
+                    val json = JSONObject(streamJson)
+                    val track = Track(
+                        uri          = Uri.parse(json.getString("url")),
+                        title        = json.optString("title", result.title),
+                        artist       = json.optString("artist", result.artist),
+                        durationMs   = json.optLong("durationSeconds", 0) * 1000L,
+                        videoId      = result.videoId,
+                        thumbnailUrl = json.optString("thumbnail", result.thumbnail)
+                    )
+                    tracks.add(track)
+                    trackAdapter.updateTracks(tracks)
+                    if (!started) {
+                        binding.albumPageProgress.isVisible = false
+                        loadTrack(tracks.size - 1)
+                        started = true
+                    } else {
+                        player?.addMediaItem(MediaItem.fromUri(track.uri))
+                    }
+                } catch (_: Exception) { }
+            }
+            if (!started) {
+                binding.albumPageProgress.isVisible = false
+                setStatus("Couldn't play this album.", StatusType.ERROR)
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // SEARCH RESULTS (inline on the Search page)
+    // ─────────────────────────────────────────────
+
+    /** Builds one shelf's header + horizontal RecyclerView and appends it to [container]. */
+    private fun buildShelfRow(container: ViewGroup, shelf: HomeShelf) {
+        if (shelf.items.isEmpty()) return
+
+        val header = TextView(this).apply {
+            text = shelf.title
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            val px = (20 * resources.displayMetrics.density).toInt()
+            setPadding(px, 0, px, (10 * resources.displayMetrics.density).toInt())
+            layoutParams = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (4 * resources.displayMetrics.density).toInt() }
+        }
+
+        val rv = RecyclerView(this).apply {
+            layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
+            adapter = HomeCardAdapter { card -> onHomeCardClick(card) }
+                .also { it.submitList(shelf.items) }
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isNestedScrollingEnabled = false
+            val ph = (12 * resources.displayMetrics.density).toInt()
+            setPadding(ph, 0, ph, (20 * resources.displayMetrics.density).toInt())
+            clipToPadding = false
+            layoutParams = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        container.addView(header)
+        container.addView(rv)
+    }
+
+    /** Empty-query state: reuse the already-fetched Home shelves as search recommendations. */
+    private fun showSearchRecommendations() {
+        binding.searchSectionsLabel.text = "Search recommendations"
+        binding.searchSectionsLabel.isVisible = homeDataCache.isNotEmpty()
+        binding.searchSongsLabel.isVisible = false
+        binding.searchShelvesContainer.removeAllViews()
+        binding.searchSongsRecycler.isVisible = false
+        homeDataCache.take(4).forEach { shelf -> buildShelfRow(binding.searchShelvesContainer, shelf) }
+    }
+
+    /** Renders categorized search results: Albums / Singles shelves + a vertical Songs list. */
+    private fun renderSearchResults(query: String, songs: List<SearchResult>, albums: List<HomeCard>, singles: List<HomeCard>) {
+        binding.searchShelvesContainer.removeAllViews()
+
+        val hasShelves = albums.isNotEmpty() || singles.isNotEmpty()
+        binding.searchSectionsLabel.isVisible = false
+        if (albums.isNotEmpty()) buildShelfRow(binding.searchShelvesContainer, HomeShelf("Albums", albums))
+        if (singles.isNotEmpty()) buildShelfRow(binding.searchShelvesContainer, HomeShelf("Singles", singles))
+
+        binding.searchSongsLabel.isVisible = songs.isNotEmpty()
+        binding.searchSongsRecycler.isVisible = songs.isNotEmpty()
+        searchResultsAdapter.update(songs)
+
+        if (songs.isEmpty() && !hasShelves) {
+            setStatus("No results for \"$query\"", StatusType.NEUTRAL)
+        } else {
+            setStatus("Results for \"$query\"", StatusType.NEUTRAL)
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -1144,7 +1345,6 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         listOf(binding.eqLowVal, binding.eqMidVal, binding.eqHighVal).forEach { it.setTextColor(theme.accentColor) }
         binding.newPlaylistBtn.setTextColor(theme.accentColor)
         binding.miniPlayerProgressLine.setBackgroundColor(theme.accentColor)
-        binding.searchSheetProgress.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
         binding.playlistBrowseProgress.indeterminateTintList = android.content.res.ColorStateList.valueOf(theme.accentColor)
         (binding.eqPresets.tag as? TextView)?.let { updateChipSelection(binding.eqPresets, it) }
         (binding.timerChips.tag as? TextView)?.let { updateChipSelection(binding.timerChips, it) }
@@ -1323,6 +1523,11 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
             else Color.argb(153, 255, 255, 255)
         )
+        binding.albumPageRepeatBtn.alpha = binding.repeatBtn.alpha
+        binding.albumPageRepeatBtn.setColorFilter(
+            if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
+            else Color.argb(153, 255, 255, 255)
+        )
     }
 
     private fun clearQueue() {
@@ -1424,6 +1629,8 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         binding.miniPlayPauseBtn.setImageResource(
             if (playing) R.drawable.ic_pause else R.drawable.ic_play
         )
+        binding.albumPagePlayIcon.visibility  = if (playing) View.GONE else View.VISIBLE
+        binding.albumPagePauseIcon.visibility = if (playing) View.VISIBLE else View.GONE
     }
 
     private fun updateProgressUI() {
@@ -1487,6 +1694,8 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     // STREAM
     // ─────────────────────────────────────────────
 
+    private var searchDebounceJob: Job? = null
+
     private fun startStream() {
         val input = binding.urlInput.text?.toString()?.trim() ?: ""
         if (input.isEmpty()) { setStatus("enter a song name or url.", StatusType.ERROR); return }
@@ -1497,49 +1706,76 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         val isUrl = input.startsWith("http://") || input.startsWith("https://")
         if (isUrl) { streamDirectUrl(input); return }
 
+        searchDebounceJob?.cancel()
+        lifecycleScope.launch { performSearch(input) }
+    }
+
+    /** Debounced live search triggered as the user types. Cancels any in-flight wait/search on every keystroke. */
+    private fun scheduleLiveSearch(query: String) {
+        searchDebounceJob?.cancel()
+        if (query.isBlank()) { showSearchRecommendations(); return }
+        if (query.startsWith("http://") || query.startsWith("https://")) return
+        if (query.length < 2) return
+
+        searchDebounceJob = lifecycleScope.launch {
+            delay(450)
+            performSearch(query)
+        }
+    }
+
+    private suspend fun performSearch(input: String) {
         setStatus("searching…", StatusType.NEUTRAL)
         binding.fetchBtn.isEnabled = false
         binding.progressBar.isVisible = true
-        showSearchSheet(searching = true)
 
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("search_tracks", input, 15).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            binding.fetchBtn.isEnabled = true
-            binding.progressBar.isVisible = false
-            binding.searchSheetProgress.isVisible = false
-
-            if (result.startsWith("ERROR")) {
-                setStatus(result, StatusType.ERROR)
-                hideSearchSheet()
-                return@launch
-            }
+        val result = withContext(Dispatchers.IO) {
             try {
-                val arr = JSONArray(result)
-                val list = (0 until arr.length()).map { i ->
-                    val obj = arr.getJSONObject(i)
-                    SearchResult(
-                        videoId         = obj.optString("videoId"),
-                        title           = obj.optString("title", "Unknown"),
-                        artist          = obj.optString("artist", ""),
-                        duration        = obj.optString("duration", ""),
-                        durationSeconds = obj.optInt("durationSeconds", 0),
-                        thumbnail       = obj.optString("thumbnail", ""),
-                        webpageUrl      = obj.optString("webpage_url", ""),
-                    )
-                }
-                binding.searchSheetTitle.text = "Results for \"$input\""
-                searchResultsAdapter.update(list)
-                binding.urlInput.text?.clear()
-                setStatus("${list.size} results", StatusType.NEUTRAL)
-            } catch (e: Exception) {
-                setStatus("ERROR: ${e.message}", StatusType.ERROR)
-                hideSearchSheet()
+                Python.getInstance().getModule("main")
+                    .callAttr("search_all", input, 20).toString()
+            } catch (e: Exception) { "ERROR: ${e.message}" }
+        }
+        binding.fetchBtn.isEnabled = true
+        binding.progressBar.isVisible = false
+
+        if (result.startsWith("ERROR")) {
+            setStatus(result, StatusType.ERROR)
+            return
+        }
+        try {
+            val obj = JSONObject(result)
+
+            fun parseSongs(arr: JSONArray): List<SearchResult> = (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                SearchResult(
+                    videoId         = o.optString("videoId"),
+                    title           = o.optString("title", "Unknown"),
+                    artist          = o.optString("artist", ""),
+                    duration        = o.optString("duration", ""),
+                    durationSeconds = o.optInt("durationSeconds", 0),
+                    thumbnail       = o.optString("thumbnail", ""),
+                    webpageUrl      = o.optString("webpage_url", ""),
+                )
             }
+
+            fun parseCards(arr: JSONArray): List<HomeCard> = (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                HomeCard(
+                    videoId    = o.optString("videoId", ""),
+                    playlistId = o.optString("playlistId").ifEmpty { null },
+                    title      = o.optString("title", "Unknown"),
+                    artist     = o.optString("artist", ""),
+                    thumbnail  = o.optString("thumbnail", ""),
+                    type       = HomeCardType.ALBUM
+                )
+            }
+
+            val songs   = parseSongs(obj.optJSONArray("songs") ?: JSONArray())
+            val albums  = parseCards(obj.optJSONArray("albums") ?: JSONArray())
+            val singles = parseCards(obj.optJSONArray("singles") ?: JSONArray())
+
+            renderSearchResults(input, songs, albums, singles)
+        } catch (e: Exception) {
+            setStatus("ERROR: ${e.message}", StatusType.ERROR)
         }
     }
 
@@ -1935,6 +2171,7 @@ private fun showLoginWebView() {
         val dim    = Color.argb(100, 255, 255, 255)
         binding.likeBtn.setColorFilter(if (rating == "LIKE") accent else dim)
         binding.dislikeBtn.setColorFilter(if (rating == "DISLIKE") accent else dim)
+        binding.albumPageLikeBtn.setColorFilter(if (rating == "LIKE") accent else dim)
     }
 
     private fun resetLikeUI() {
