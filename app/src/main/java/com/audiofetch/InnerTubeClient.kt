@@ -98,6 +98,14 @@ object InnerTubeClient {
             post(NEXT_URL, body, cookies)
         }
 
+    suspend fun getLibraryAlbums(cookies: String? = null): JSONObject =
+        withContext(Dispatchers.IO) {
+            val body = baseContext(cookies).apply {
+                put("browseId", "FEmusic_liked_albums")
+            }
+            post(BROWSE_URL, body, cookies)
+        }
+
     suspend fun browsePlaylist(browseId: String, cookies: String? = null): JSONObject =
         withContext(Dispatchers.IO) {
             val body = baseContext(cookies).apply {
