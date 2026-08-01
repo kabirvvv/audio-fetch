@@ -89,6 +89,42 @@ fun parseContinuation(root: JSONObject): List<HomeShelf> {
     }
     return shelves
 }
+    /** Parses the "FEmusic_liked_albums" browse response — a grid of saved albums. */
+    fun parseLibraryAlbums(root: JSONObject): List<HomeCard> {
+        val sections = root
+            .optJSONObject("contents")
+            ?.optJSONObject("singleColumnBrowseResultsRenderer")
+            ?.optJSONArray("tabs")
+            ?.optJSONObject(0)
+            ?.optJSONObject("tabRenderer")
+            ?.optJSONObject("content")
+            ?.optJSONObject("sectionListRenderer")
+            ?.optJSONArray("contents")
+            ?: return emptyList()
+
+        val items = mutableListOf<HomeCard>()
+        for (i in 0 until sections.length()) {
+            val section = sections.getJSONObject(i)
+
+            val gridItems = section.optJSONObject("gridRenderer")?.optJSONArray("items")
+            if (gridItems != null) {
+                for (j in 0 until gridItems.length()) {
+                    val card = parseMusicTwoRowItemRenderer(
+                        gridItems.getJSONObject(j).optJSONObject("musicTwoRowItemRenderer")
+                    ) ?: continue
+                    items.add(card.copy(type = HomeCardType.ALBUM))
+                }
+                continue
+            }
+
+            // Some accounts get this back as a vertical shelf instead of a grid.
+            section.optJSONObject("musicShelfRenderer")?.let { shelf ->
+                parseMusicShelf(shelf)?.items?.forEach { items.add(it.copy(type = HomeCardType.ALBUM)) }
+            }
+        }
+        return items
+    }
+
     // ── Carousel (horizontal row) ─────────────────────────────────────────────
 
     private fun parseCarousel(carousel: JSONObject): HomeShelf? {
