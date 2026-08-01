@@ -1,3 +1,4 @@
+
 import yt_dlp
 import os
 import re
@@ -810,4 +811,92 @@ def setup_account(cookie_string: str) -> str:
     except Exception as e:
         # Clean up bad auth file
         try:
- 
+            os.remove(_AUTH_PATH)
+        except Exception:
+            pass
+        _ytmusic_authed = None
+        return f"ERROR: {str(e)}"
+
+
+def get_account_info() -> str:
+    """Return cached account info if authenticated.
+
+    Returns JSON: {"authenticated": bool, "name": "...", "email": "..."}
+    """
+    global _ytmusic_authed
+
+    if not os.path.exists(_AUTH_PATH):
+        return json.dumps({"authenticated": False, "name": "", "email": ""})
+
+    try:
+        if _ytmusic_authed is None:
+            _ytmusic_authed = YTMusic(_AUTH_PATH)
+        info = _ytmusic_authed.get_account_info()
+        name  = info.get("accountName") or info.get("name") or "YouTube Music user"
+        email = info.get("accountEmail") or info.get("email") or ""
+        return json.dumps({"authenticated": True, "name": name, "email": email})
+    except Exception:
+        _ytmusic_authed = None
+        return json.dumps({"authenticated": False, "name": "", "email": ""})
+
+
+def sign_out() -> str:
+    """Delete auth file and clear the authenticated instance."""
+    global _ytmusic_authed
+    _ytmusic_authed = None
+    try:
+        if os.path.exists(_AUTH_PATH):
+            os.remove(_AUTH_PATH)
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+    return json.dumps({"success": True})
+
+
+def rate_song(video_id: str, rating: str) -> str:
+    """Rate a song. rating must be LIKE, DISLIKE, or INDIFFERENT.
+
+    Returns JSON: {"success": true} or "ERROR: ..."
+    """
+    yt = _get_authed()
+    if yt is None:
+        return "ERROR: not authenticated"
+    if rating not in ("LIKE", "DISLIKE", "INDIFFERENT"):
+        return "ERROR: invalid rating"
+    try:
+        yt.rate_song(video_id, rating)
+        return json.dumps({"success": True})
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+
+def get_liked_songs(limit: int = 100) -> str:
+    """Fetch the user's liked songs playlist.
+
+    Returns JSON array of SearchResult-compatible dicts.
+    """
+    yt = _get_authed()
+    if yt is None:
+        return "ERROR: not authenticated"
+    try:
+        raw = yt.get_liked_songs(limit=limit)
+        results = []
+        for item in (raw.get("tracks") or []):
+            vid = item.get("videoId", "")
+            if not vid:
+                continue
+            artists = item.get("artists") or []
+            artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
+            duration_secs = item.get("duration_seconds") or 0
+            thumbnail = _best_thumbnail(item.get("thumbnails") or [])
+            results.append({
+                "videoId":         vid,
+                "title":           item.get("title", "Unknown"),
+                "artist":          artist,
+                "duration":        _format_duration(duration_secs),
+                "durationSeconds": duration_secs,
+                "thumbnail":       thumbnail,
+                "webpage_url":     f"https://music.youtube.com/watch?v={vid}",
+            })
+        return json.dumps(results)
+    except Exception as e:
+        return f"ERROR: {str(e)}"
