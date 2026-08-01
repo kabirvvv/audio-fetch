@@ -35,6 +35,10 @@
     <color name="text_faint">#40FFFFFF</color>
     <color name="text_label">#33FFFFFF</color>
 
+    <!-- Editorial tracklist tones (softer than pure white/50% grey) -->
+    <color name="text_editorial">#E9E9E9</color>
+    <color name="text_editorial_muted">#9A9A9A</color>
+
     <!-- Icon tints -->
     <color name="icon_high">#FFFFFF</color>
     <color name="icon_muted">#99FFFFFF</color>
