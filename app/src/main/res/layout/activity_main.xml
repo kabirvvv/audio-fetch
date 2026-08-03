@@ -205,43 +205,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="20dp"
-                android:paddingBottom="16dp"
+                android:paddingBottom="24dp"
                 android:text="Good evening"
                 android:textColor="@color/text_high"
                 android:textSize="22sp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.02" />
-
-            <LinearLayout
-                android:id="@+id/recentlyPlayedSection"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="20dp"
-                    android:paddingBottom="10dp"
-                    android:text="Recently Played"
-                    android:textColor="@color/text_high"
-                    android:textSize="15sp"
-                    android:fontFamily="sans-serif-medium" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recentlyPlayedRecycler"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="20dp"
-                    android:clipToPadding="false"
-                    android:overScrollMode="never"
-                    android:scrollbars="none"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/libraryAlbumsSection"
@@ -265,9 +234,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="20dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="28dp"
                     android:clipToPadding="false"
                     android:overScrollMode="never"
                     android:scrollbars="none"
@@ -285,25 +254,25 @@
                 <View
                     android:layout_width="120dp"
                     android:layout_height="14dp"
-                    android:layout_marginBottom="10dp"
+                    android:layout_marginBottom="12dp"
                     android:background="@drawable/bg_shimmer_pill" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="24dp">
+                    android:layout_marginBottom="28dp">
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginEnd="16dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginEnd="16dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
@@ -315,25 +284,25 @@
                 <View
                     android:layout_width="90dp"
                     android:layout_height="14dp"
-                    android:layout_marginBottom="10dp"
+                    android:layout_marginBottom="12dp"
                     android:background="@drawable/bg_shimmer_pill" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="24dp">
+                    android:layout_marginBottom="28dp">
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginEnd="16dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginEnd="16dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
@@ -345,7 +314,7 @@
                 <View
                     android:layout_width="140dp"
                     android:layout_height="14dp"
-                    android:layout_marginBottom="10dp"
+                    android:layout_marginBottom="12dp"
                     android:background="@drawable/bg_shimmer_pill" />
 
                 <LinearLayout
@@ -357,13 +326,13 @@
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginEnd="16dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginEnd="16dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
@@ -402,13 +371,48 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="20dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="28dp"
                     android:clipToPadding="false"
                     android:overScrollMode="never"
                     android:scrollbars="none"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/homeFooter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="24dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="32dp">
+
+                <ImageButton
+                    android:id="@+id/homeFooterSettingsBtn"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_menu_dots"
+                    android:tint="@color/icon_dim"
+                    android:contentDescription="Settings" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AudioFetch"
+                    android:textColor="@color/text_label"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.15"
+                    android:fontFamily="sans-serif-medium" />
+
             </LinearLayout>
 
         </LinearLayout>
