@@ -18,6 +18,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -116,7 +117,6 @@ class MainActivity : AppCompatActivity() {
             uiHandler.postDelayed(this, 250)
         }
     }
-    private lateinit var recentlyPlayedAdapter: HomeCardAdapter
     private lateinit var libraryAlbumsAdapter: HomeCardAdapter
     private lateinit var playlistBrowseAdapter: SearchResultsAdapter
     private lateinit var trackAdapter: TrackAdapter
@@ -325,6 +325,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.clearQueueBtn.setOnClickListener { clearQueue() }
         binding.menuBtn.setOnClickListener { showSettings() }
+        binding.homeFooterSettingsBtn.setOnClickListener { showSettings() }
         binding.closeSettingsBtn.setOnClickListener { hideSettings() }
 
         binding.scrim.setOnClickListener {
@@ -352,12 +353,66 @@ class MainActivity : AppCompatActivity() {
         setupHomeAdapters()
         setupPlaylistBrowseSheet()
         setupAlbumPage()
+        setupSwipeNavigation()
         switchTab(Tab.HOME)
     }
 
     // ─────────────────────────────────────────────
     // BOTTOM NAV / TAB SWITCHING
     // ─────────────────────────────────────────────
+
+    /**
+     * Lets the user swipe left/right anywhere on the empty background of the
+     * Home / Search / Library pages to move between tabs, following the same
+     * left-to-right order as the bottom nav (Search → Home → Library).
+     * Attached directly to the scroll containers rather than an overlay, so a
+     * touch is only handled here when it lands on empty space with no child
+     * view underneath it (cards, buttons, and RecyclerView rows still get
+     * normal touch handling first).
+     */
+    private fun setupSwipeNavigation() {
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (e1 == null) return false
+                val deltaX = e2.x - e1.x
+                val deltaY = e2.y - e1.y
+                val minDistance = 120 * resources.displayMetrics.density
+                val minVelocity = 300 * resources.displayMetrics.density
+                if (kotlin.math.abs(deltaX) < minDistance) return false
+                if (kotlin.math.abs(deltaX) < kotlin.math.abs(deltaY)) return false
+                if (kotlin.math.abs(velocityX) < minVelocity) return false
+                switchTab(if (deltaX < 0) nextTab(currentTab) else previousTab(currentTab))
+                return true
+            }
+        })
+
+        val swipeTouchListener = View.OnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            false
+        }
+
+        binding.homeContainer.setOnTouchListener(swipeTouchListener)
+        binding.searchContainer.setOnTouchListener(swipeTouchListener)
+        binding.searchResultsScroll.setOnTouchListener(swipeTouchListener)
+        binding.libraryContainer.setOnTouchListener(swipeTouchListener)
+    }
+
+    private fun nextTab(tab: Tab): Tab = when (tab) {
+        Tab.SEARCH  -> Tab.HOME
+        Tab.HOME    -> Tab.LIBRARY
+        Tab.LIBRARY -> Tab.LIBRARY
+    }
+
+    private fun previousTab(tab: Tab): Tab = when (tab) {
+        Tab.SEARCH  -> Tab.SEARCH
+        Tab.HOME    -> Tab.SEARCH
+        Tab.LIBRARY -> Tab.HOME
+    }
 
     private fun switchTab(tab: Tab) {
         currentTab = tab
@@ -448,12 +503,6 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     private fun setupHomeAdapters() {
-        recentlyPlayedAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
-        binding.recentlyPlayedRecycler.apply {
-            layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
-            adapter = recentlyPlayedAdapter
-        }
-
         libraryAlbumsAdapter = HomeCardAdapter { card -> onHomeCardClick(card) }
         binding.libraryAlbumsRecycler.apply {
             layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
@@ -467,22 +516,6 @@ class MainActivity : AppCompatActivity() {
             hour < 12 -> "Good morning"
             hour < 17 -> "Good afternoon"
             else      -> "Good evening"
-        }
-
-        val history = LibraryManager.getHistory().takeLast(10).reversed()
-        if (history.isNotEmpty()) {
-            recentlyPlayedAdapter.submitList(history.map { track ->
-                HomeCard(
-                    videoId   = track.videoId ?: "",
-                    title     = track.title,
-                    artist    = track.artist,
-                    thumbnail = track.thumbnailUrl,
-                    type      = HomeCardType.TRACK,
-                )
-            })
-            binding.recentlyPlayedSection.isVisible = true
-        } else {
-            binding.recentlyPlayedSection.isVisible = false
         }
 
         binding.homeShelvesContainer.removeAllViews()
@@ -1089,11 +1122,11 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             setTextColor(0xFFFFFFFF.toInt())
             typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
             val px = (20 * resources.displayMetrics.density).toInt()
-            setPadding(px, 0, px, (10 * resources.displayMetrics.density).toInt())
+            setPadding(px, 0, px, (12 * resources.displayMetrics.density).toInt())
             layoutParams = ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (4 * resources.displayMetrics.density).toInt() }
+            ).apply { topMargin = (8 * resources.displayMetrics.density).toInt() }
         }
 
         val rv = RecyclerView(this).apply {
@@ -1102,8 +1135,8 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
                 .also { it.submitList(shelf.items) }
             overScrollMode = View.OVER_SCROLL_NEVER
             isNestedScrollingEnabled = false
-            val ph = (12 * resources.displayMetrics.density).toInt()
-            setPadding(ph, 0, ph, (20 * resources.displayMetrics.density).toInt())
+            val ph = (16 * resources.displayMetrics.density).toInt()
+            setPadding(ph, 0, ph, (28 * resources.displayMetrics.density).toInt())
             clipToPadding = false
             layoutParams = ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
