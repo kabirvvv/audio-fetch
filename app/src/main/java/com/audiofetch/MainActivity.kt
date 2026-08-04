@@ -18,7 +18,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
@@ -75,6 +74,7 @@ class MainActivity : AppCompatActivity() {
 
     // ── Playback ──────────────────────────────────────────────────────────────
     private var autoplayEnabled = false
+    private var autoplayFetchInProgress = false
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var player: MediaController? = null
     private var androidVisualizer: Visualizer? = null
@@ -82,6 +82,10 @@ class MainActivity : AppCompatActivity() {
     private val tracks = mutableListOf<Track>()
     private var currentIndex = -1
     private var repeatMode = Player.REPEAT_MODE_OFF
+    private var shuffleEnabled = false
+    private var repeatTapCount = 0
+    private var repeatTapRunnable: Runnable? = null
+    private val REPEAT_TAP_WINDOW_MS = 350L
     private var currentTheme = VibeThemes.all[0]
     private var sleepTimerHandler: Handler? = null
     private var sleepTimerRunnable: Runnable? = null
@@ -92,6 +96,10 @@ class MainActivity : AppCompatActivity() {
     private var lyricsVisible = false
     private var syncedLines: List<LrcLine> = emptyList()
     private var currentLyricLine = -1
+    private var lyricsPlainFallback: String? = null
+    private var lyricsAvailable = false
+    private var lyricsPreviewText = ""
+    private var lyricsFetchJob: Job? = null
     private lateinit var lyricsAdapter: LyricsAdapter
 
     // ── Like state ────────────────────────────────────────────────────────────
@@ -214,6 +222,24 @@ class MainActivity : AppCompatActivity() {
         }
         itemTouchHelper.attachToRecyclerView(binding.playlistRecycler)
 
+        // Auto-queue only fires when the user scrolls to the bottom of the
+        // queue list — not continuously during playback — so listening for
+        // a long time doesn't silently balloon the queue forever.
+        binding.playlistRecycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (!autoplayEnabled || autoplayFetchInProgress) return
+                if (dy <= 0) return // only care about scrolling further down
+                val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                val itemCount = trackAdapter.itemCount
+                if (itemCount == 0) return
+                val lastVisible = lm.findLastVisibleItemPosition()
+                if (lastVisible >= itemCount - 1) {
+                    val seedId = tracks.getOrNull(currentIndex)?.videoId ?: tracks.lastOrNull()?.videoId
+                    if (seedId != null) fetchAndAppendAutoplay(seedId)
+                }
+            }
+        })
+
         // ── Library ───────────────────────────────────────────────────────────
         libraryAdapter = LibraryAdapter(emptyList(), ::playFromLibrary, ::onLibraryTrackLongPress)
         binding.libraryRecycler.apply {
@@ -261,9 +287,8 @@ class MainActivity : AppCompatActivity() {
         binding.connectAccountBtn.setOnClickListener { showLoginWebView() }
         binding.signOutBtn.setOnClickListener { handleSignOut() }
 
-        // ── Like / Dislike buttons ────────────────────────────────────────────
-        binding.likeBtn.setOnClickListener    { rateCurrentTrack("LIKE") }
-        binding.dislikeBtn.setOnClickListener { rateCurrentTrack("DISLIKE") }
+        // ── Like button ────────────────────────────────────────────────────────
+        binding.likeBtn.setOnClickListener { rateCurrentTrack("LIKE") }
 
         // ── Full player swipe-down to dismiss ─────────────────────────────────
         var touchStartY = 0f
@@ -297,7 +322,8 @@ class MainActivity : AppCompatActivity() {
         binding.playPauseBtn.setOnClickListener { togglePlayPause() }
         binding.nextBtn.setOnClickListener { playNext() }
         binding.prevBtn.setOnClickListener { playPrev() }
-        binding.repeatBtn.setOnClickListener { cycleRepeat() }
+        binding.repeatBtn.setOnClickListener { onRepeatBtnTapped() }
+        binding.albumPageRepeatBtn.setOnClickListener { onRepeatBtnTapped() }
         binding.seekBar.onSeek = { fraction ->
             player?.let { p -> p.seekTo((fraction * p.duration).toLong()) }
         }
@@ -313,10 +339,6 @@ class MainActivity : AppCompatActivity() {
                 else Color.argb(153, 255, 255, 255)
             )
             if (autoplayEnabled) {
-                val seedId = tracks.getOrNull(currentIndex)?.videoId
-                if (seedId != null && currentIndex >= tracks.size - 2) {
-                    fetchAndAppendAutoplay(seedId)
-                }
                 setStatus("autoplay on", StatusType.SUCCESS)
             } else {
                 setStatus("autoplay off", StatusType.NEUTRAL)
@@ -325,7 +347,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.clearQueueBtn.setOnClickListener { clearQueue() }
         binding.menuBtn.setOnClickListener { showSettings() }
-        binding.homeFooterSettingsBtn.setOnClickListener { showSettings() }
+        binding.homeHeaderSettingsBtn.setOnClickListener { showSettings() }
         binding.closeSettingsBtn.setOnClickListener { hideSettings() }
 
         binding.scrim.setOnClickListener {
@@ -341,7 +363,8 @@ class MainActivity : AppCompatActivity() {
             adapter = lyricsAdapter
         }
         binding.lyricsBackBtn.setOnClickListener { hideLyrics() }
-        binding.lyricsBtn.setOnClickListener { showLyrics() }
+        binding.lyricsPreviewExpandBtn.setOnClickListener { showLyrics() }
+        binding.lyricsPreviewSection.setOnClickListener { showLyrics() }
         binding.lyricsSheet.post {
             binding.lyricsSheet.translationY = binding.lyricsSheet.height.toFloat()
         }
@@ -362,44 +385,13 @@ class MainActivity : AppCompatActivity() {
     // ─────────────────────────────────────────────
 
     /**
-     * Lets the user swipe left/right anywhere on the empty background of the
-     * Home / Search / Library pages to move between tabs, following the same
-     * left-to-right order as the bottom nav (Search → Home → Library).
-     * Attached directly to the scroll containers rather than an overlay, so a
-     * touch is only handled here when it lands on empty space with no child
-     * view underneath it (cards, buttons, and RecyclerView rows still get
-     * normal touch handling first).
+     * Wires up left/right swipe navigation between Search → Home → Library,
+     * matching the bottom nav's order. Conflict-avoidance with horizontally
+     * scrolling cards/shelves is handled inside SwipeNavContainer itself.
      */
     private fun setupSwipeNavigation() {
-        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onFling(
-                e1: MotionEvent?,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
-                if (e1 == null) return false
-                val deltaX = e2.x - e1.x
-                val deltaY = e2.y - e1.y
-                val minDistance = 120 * resources.displayMetrics.density
-                val minVelocity = 300 * resources.displayMetrics.density
-                if (kotlin.math.abs(deltaX) < minDistance) return false
-                if (kotlin.math.abs(deltaX) < kotlin.math.abs(deltaY)) return false
-                if (kotlin.math.abs(velocityX) < minVelocity) return false
-                switchTab(if (deltaX < 0) nextTab(currentTab) else previousTab(currentTab))
-                return true
-            }
-        })
-
-        val swipeTouchListener = View.OnTouchListener { _, event ->
-            detector.onTouchEvent(event)
-            false
-        }
-
-        binding.homeContainer.setOnTouchListener(swipeTouchListener)
-        binding.searchContainer.setOnTouchListener(swipeTouchListener)
-        binding.searchResultsScroll.setOnTouchListener(swipeTouchListener)
-        binding.libraryContainer.setOnTouchListener(swipeTouchListener)
+        binding.swipeNavContainer.onSwipeLeft = { switchTab(nextTab(currentTab)) }
+        binding.swipeNavContainer.onSwipeRight = { switchTab(previousTab(currentTab)) }
     }
 
     private fun nextTab(tab: Tab): Tab = when (tab) {
@@ -572,34 +564,39 @@ private suspend fun fetchOnlineShelves(seedVideoId: String): List<HomeShelf> {
 
 // Replace fetchAndAppendAutoplay() to use InnerTube instead of Python:
 private fun fetchAndAppendAutoplay(videoId: String?) {
-    if (videoId.isNullOrEmpty()) return
+    if (videoId.isNullOrEmpty() || autoplayFetchInProgress) return
+    autoplayFetchInProgress = true
     lifecycleScope.launch {
-        val related = HomeRepository.getWatchNext(videoId, this@MainActivity)
-        for (card in related) {
-            if (card.videoId.isEmpty()) continue
-            if (tracks.any { it.videoId == card.videoId }) continue
+        try {
+            val related = HomeRepository.getWatchNext(videoId, this@MainActivity)
+            for (card in related) {
+                if (card.videoId.isEmpty()) continue
+                if (tracks.any { it.videoId == card.videoId }) continue
 
-            val streamJson = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_stream_url_by_id", card.videoId).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
+                val streamJson = withContext(Dispatchers.IO) {
+                    try {
+                        Python.getInstance().getModule("main")
+                            .callAttr("get_stream_url_by_id", card.videoId).toString()
+                    } catch (e: Exception) { "ERROR: ${e.message}" }
+                }
+                if (streamJson.startsWith("ERROR")) continue
+
+                val json = org.json.JSONObject(streamJson)
+                val track = Track(
+                    uri          = android.net.Uri.parse(json.getString("url")),
+                    title        = json.optString("title", card.title),
+                    artist       = json.optString("artist", card.artist),
+                    durationMs   = json.optLong("durationSeconds", 0) * 1000L,
+                    videoId      = card.videoId,
+                    isAutoplay   = true,
+                    thumbnailUrl = json.optString("thumbnail", card.thumbnail)
+                )
+                tracks.add(track)
+                player?.addMediaItem(MediaItem.fromUri(track.uri))
+                trackAdapter.updateTracks(tracks)
             }
-            if (streamJson.startsWith("ERROR")) continue
-
-            val json = org.json.JSONObject(streamJson)
-            val track = Track(
-                uri          = android.net.Uri.parse(json.getString("url")),
-                title        = json.optString("title", card.title),
-                artist       = json.optString("artist", card.artist),
-                durationMs   = json.optLong("durationSeconds", 0) * 1000L,
-                videoId      = card.videoId,
-                isAutoplay   = true,
-                thumbnailUrl = json.optString("thumbnail", card.thumbnail)
-            )
-            tracks.add(track)
-            player?.addMediaItem(MediaItem.fromUri(track.uri))
-            trackAdapter.updateTracks(tracks)
+        } finally {
+            autoplayFetchInProgress = false
         }
     }
 }   
@@ -954,11 +951,6 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             if (player?.isPlaying == true && tracks.isNotEmpty()) togglePlayPause()
             else playAlbumQueue(details, shuffle = false)
         }
-        binding.albumPageShuffleBtn.setOnClickListener {
-            val details = currentAlbumDetails ?: return@setOnClickListener
-            playAlbumQueue(details, shuffle = true)
-        }
-        binding.albumPageRepeatBtn.setOnClickListener { cycleRepeat() }
         binding.albumPageLikeBtn.setOnClickListener { rateCurrentTrack("LIKE") }
     }
 
@@ -1197,35 +1189,57 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         }
 
         binding.lyricsTitleText.text = track.title
-        binding.lyricsLoadingIndicator.isVisible = true
-        lyricsAdapter.update(emptyList())
 
-        lifecycleScope.launch {
-            val (lines, plain) = LyricsManager.fetch(
-                title   = track.title,
-                artist  = track.artist,
-                videoId = track.videoId ?: ""
-            )
-            binding.lyricsLoadingIndicator.isVisible = false
-            if (lines.isNotEmpty()) {
-                syncedLines = lines
-                currentLyricLine = -1
-                lyricsAdapter.update(lines.map { it.text })
+        when {
+            syncedLines.isNotEmpty() -> {
+                binding.lyricsLoadingIndicator.isVisible = false
+                lyricsAdapter.update(syncedLines.map { it.text })
                 val pos = player?.currentPosition ?: 0L
-                val idx = lines.indexOfLast { it.timeMs <= pos }
+                val idx = syncedLines.indexOfLast { it.timeMs <= pos }
                 if (idx >= 0) {
                     lyricsAdapter.setCurrentLine(idx)
                     currentLyricLine = idx
                     binding.lyricsRecycler.scrollToPosition(
-                        (idx + 2).coerceAtMost(lines.size - 1)
+                        (idx + 2).coerceAtMost(syncedLines.size - 1)
                     )
                 }
-            } else {
-                syncedLines = emptyList()
-                currentLyricLine = -1
-                lyricsAdapter.update(
-                    plain?.lines()?.filter { it.isNotBlank() } ?: listOf("No lyrics found")
-                )
+            }
+            !lyricsPlainFallback.isNullOrBlank() -> {
+                binding.lyricsLoadingIndicator.isVisible = false
+                lyricsAdapter.update(lyricsPlainFallback!!.lines().filter { it.isNotBlank() })
+            }
+            else -> {
+                // Not yet resolved by the prefetch (or the track has no lyrics) —
+                // fetch live so opening the sheet still works either way.
+                binding.lyricsLoadingIndicator.isVisible = true
+                lyricsAdapter.update(emptyList())
+                lifecycleScope.launch {
+                    val (lines, plain) = LyricsManager.fetch(
+                        title   = track.title,
+                        artist  = track.artist,
+                        videoId = track.videoId ?: ""
+                    )
+                    binding.lyricsLoadingIndicator.isVisible = false
+                    if (lines.isNotEmpty()) {
+                        syncedLines = lines
+                        currentLyricLine = -1
+                        lyricsAdapter.update(lines.map { it.text })
+                        val pos = player?.currentPosition ?: 0L
+                        val idx = lines.indexOfLast { it.timeMs <= pos }
+                        if (idx >= 0) {
+                            lyricsAdapter.setCurrentLine(idx)
+                            currentLyricLine = idx
+                            binding.lyricsRecycler.scrollToPosition(
+                                (idx + 2).coerceAtMost(lines.size - 1)
+                            )
+                        }
+                    } else {
+                        lyricsPlainFallback = plain
+                        lyricsAdapter.update(
+                            plain?.lines()?.filter { it.isNotBlank() } ?: listOf("No lyrics found")
+                        )
+                    }
+                }
             }
         }
     }
@@ -1236,6 +1250,103 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             .translationY(binding.lyricsSheet.height.toFloat())
             .setDuration(300)
             .withEndAction { binding.lyricsSheet.visibility = View.GONE }
+            .start()
+    }
+
+    /**
+     * Fetches lyrics for the track that just started playing, ahead of the
+     * user opening the full lyrics sheet. Feeds the small preview drawer
+     * under the full-player controls, which only appears once lyrics are
+     * actually found.
+     */
+    private fun prefetchLyrics(track: Track) {
+        lyricsFetchJob?.cancel()
+        lyricsAvailable = false
+        syncedLines = emptyList()
+        currentLyricLine = -1
+        lyricsPlainFallback = null
+        hideLyricsPreview(animate = false)
+
+        lyricsFetchJob = lifecycleScope.launch {
+            val (lines, plain) = LyricsManager.fetch(
+                title   = track.title,
+                artist  = track.artist,
+                videoId = track.videoId ?: ""
+            )
+            if (lines.isNotEmpty()) {
+                syncedLines = lines
+                lyricsPreviewText = lines.first().text.ifBlank { "Lyrics available" }
+                lyricsAvailable = true
+            } else if (!plain.isNullOrBlank()) {
+                lyricsPlainFallback = plain
+                lyricsPreviewText = plain.lines().firstOrNull { it.isNotBlank() } ?: ""
+                lyricsAvailable = lyricsPreviewText.isNotBlank()
+            } else {
+                lyricsAvailable = false
+            }
+            if (lyricsAvailable) showLyricsPreview() else hideLyricsPreview(animate = false)
+        }
+    }
+
+    /** Animates the lyrics preview drawer open, like a drawer sliding down. */
+    private fun showLyricsPreview() {
+        val section = binding.lyricsPreviewSection
+        binding.lyricsPreviewText.text = lyricsPreviewText
+        if (section.isVisible) return
+
+        section.alpha = 0f
+        section.visibility = View.VISIBLE
+        section.layoutParams.height = 0
+        section.requestLayout()
+
+        section.post {
+            val parentWidth = (section.parent as? View)?.width ?: resources.displayMetrics.widthPixels
+            section.measure(
+                View.MeasureSpec.makeMeasureSpec(parentWidth, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.UNSPECIFIED
+            )
+            val targetHeight = section.measuredHeight
+            ValueAnimator.ofInt(0, targetHeight).apply {
+                duration = 320
+                interpolator = DecelerateInterpolator(2f)
+                addUpdateListener { anim ->
+                    section.layoutParams.height = anim.animatedValue as Int
+                    section.requestLayout()
+                }
+                start()
+            }
+            section.animate().alpha(1f).setDuration(320).start()
+        }
+    }
+
+    /** Animates the lyrics preview drawer closed. */
+    private fun hideLyricsPreview(animate: Boolean = true) {
+        val section = binding.lyricsPreviewSection
+        if (section.visibility != View.VISIBLE) return
+
+        if (!animate) {
+            section.visibility = View.GONE
+            section.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            section.alpha = 1f
+            return
+        }
+
+        val startHeight = section.height
+        ValueAnimator.ofInt(startHeight, 0).apply {
+            duration = 220
+            addUpdateListener { anim ->
+                section.layoutParams.height = anim.animatedValue as Int
+                section.requestLayout()
+            }
+            start()
+        }
+        section.animate()
+            .alpha(0f)
+            .setDuration(200)
+            .withEndAction {
+                section.visibility = View.GONE
+                section.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            }
             .start()
     }
 
@@ -1392,7 +1503,6 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         }
         binding.fetchBtn.setColorFilter(theme.accentColor)
         binding.downloadBtn.setColorFilter(theme.accentColor)
-        binding.lyricsBtn.setColorFilter(theme.accentColor)
         binding.autoplayToggleBtn.setColorFilter(
             if (autoplayEnabled) theme.accentColor else Color.argb(153, 255, 255, 255)
         )
@@ -1464,9 +1574,6 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
                     if (lyricsVisible) hideLyrics()
                     syncedLines = emptyList()
                     currentLyricLine = -1
-                    if (autoplayEnabled && idx >= tracks.size - 2) {
-                        fetchAndAppendAutoplay(tracks[idx].videoId)
-                    }
                 }
                 resetLikeUI()
             }
@@ -1544,6 +1651,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         currentIndex = index
         val track = tracks[index]
         setTrackInfo(track)
+        prefetchLyrics(track)
         trackAdapter.setNowPlaying(index)
         currentStreamWebpageUrl = track.videoId?.let { "https://music.youtube.com/watch?v=$it" }
         currentStreamTitle = track.title
@@ -1564,34 +1672,112 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
     }
 
     private fun playNext() {
+        if (shuffleEnabled) { player?.seekToNextMediaItem(); return }
         val next = currentIndex + 1
         if (next < tracks.size) loadTrack(next)
         else if (repeatMode == Player.REPEAT_MODE_ALL) loadTrack(0)
     }
 
     private fun playPrev() {
+        if (shuffleEnabled) { player?.seekToPreviousMediaItem(); return }
         val prev = currentIndex - 1
         if (prev >= 0) loadTrack(prev)
         else if (repeatMode == Player.REPEAT_MODE_ALL) loadTrack(tracks.size - 1)
     }
 
-    private fun cycleRepeat() {
-        repeatMode = when (repeatMode) {
-            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-            else                   -> Player.REPEAT_MODE_OFF
+    /**
+     * The repeat button now also controls shuffle, distinguished by tap count
+     * within a short window: single tap → repeat current track, double tap →
+     * repeat album/all, triple tap → shuffle. Whichever mode is already active
+     * gets tapped again turns it off. The button's icon morphs smoothly
+     * between the repeat glyph and the shuffle glyph as the state changes.
+     */
+    private fun onRepeatBtnTapped() {
+        repeatTapCount++
+        repeatTapRunnable?.let { uiHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            when (repeatTapCount) {
+                1 -> applyRepeatOne()
+                2 -> applyRepeatAll()
+                else -> applyShuffleTap()
+            }
+            repeatTapCount = 0
         }
-        player?.repeatMode = repeatMode
-        binding.repeatBtn.alpha = if (repeatMode == Player.REPEAT_MODE_OFF) 0.4f else 1f
-        binding.repeatBtn.setColorFilter(
-            if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
-            else Color.argb(153, 255, 255, 255)
-        )
-        binding.albumPageRepeatBtn.alpha = binding.repeatBtn.alpha
-        binding.albumPageRepeatBtn.setColorFilter(
-            if (repeatMode != Player.REPEAT_MODE_OFF) currentTheme.accentColor
-            else Color.argb(153, 255, 255, 255)
-        )
+        repeatTapRunnable = runnable
+        uiHandler.postDelayed(runnable, REPEAT_TAP_WINDOW_MS)
+    }
+
+    private fun applyRepeatOne() {
+        if (repeatMode == Player.REPEAT_MODE_ONE && !shuffleEnabled) {
+            setRepeatShuffleState(Player.REPEAT_MODE_OFF, shuffle = false)
+        } else {
+            setRepeatShuffleState(Player.REPEAT_MODE_ONE, shuffle = false)
+        }
+    }
+
+    private fun applyRepeatAll() {
+        if (repeatMode == Player.REPEAT_MODE_ALL && !shuffleEnabled) {
+            setRepeatShuffleState(Player.REPEAT_MODE_OFF, shuffle = false)
+        } else {
+            setRepeatShuffleState(Player.REPEAT_MODE_ALL, shuffle = false)
+        }
+    }
+
+    private fun applyShuffleTap() {
+        if (shuffleEnabled) {
+            setRepeatShuffleState(Player.REPEAT_MODE_OFF, shuffle = false)
+        } else {
+            setRepeatShuffleState(Player.REPEAT_MODE_OFF, shuffle = true)
+        }
+    }
+
+    private fun setRepeatShuffleState(mode: Int, shuffle: Boolean) {
+        repeatMode = mode
+        shuffleEnabled = shuffle
+        player?.repeatMode = mode
+        player?.shuffleModeEnabled = shuffle
+        updateRepeatShuffleUI()
+    }
+
+    private fun updateRepeatShuffleUI() {
+        val active = repeatMode != Player.REPEAT_MODE_OFF || shuffleEnabled
+        val tint = if (active) currentTheme.accentColor else Color.argb(153, 255, 255, 255)
+
+        morphRepeatIcon(binding.repeatIcon, binding.shuffleIcon, shuffleEnabled)
+        morphRepeatIcon(binding.albumPageRepeatIcon, binding.albumPageShuffleIcon, shuffleEnabled)
+
+        binding.repeatIcon.setColorFilter(tint)
+        binding.shuffleIcon.setColorFilter(tint)
+        binding.albumPageRepeatIcon.setColorFilter(tint)
+        binding.albumPageShuffleIcon.setColorFilter(tint)
+    }
+
+    /** Cross-fades + scale-pops between the repeat and shuffle glyphs on a shared button. */
+    private fun morphRepeatIcon(repeatIcon: ImageView, shuffleIcon: ImageView, showShuffle: Boolean) {
+        val showing = if (showShuffle) shuffleIcon else repeatIcon
+        val hiding = if (showShuffle) repeatIcon else shuffleIcon
+        if (showing.isVisible && showing.alpha == 1f) return
+
+        hiding.animate()
+            .alpha(0f)
+            .scaleX(0.5f)
+            .scaleY(0.5f)
+            .setDuration(160)
+            .withEndAction { hiding.visibility = View.GONE }
+            .start()
+
+        showing.visibility = View.VISIBLE
+        showing.alpha = 0f
+        showing.scaleX = 0.5f
+        showing.scaleY = 0.5f
+        showing.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setStartDelay(70)
+            .setDuration(220)
+            .setInterpolator(android.view.animation.OvershootInterpolator(1.6f))
+            .start()
     }
 
     private fun clearQueue() {
@@ -1610,8 +1796,12 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         hideMiniPlayer()
         hideFullPlayer()
         if (lyricsVisible) hideLyrics()
+        lyricsFetchJob?.cancel()
         syncedLines = emptyList()
         currentLyricLine = -1
+        lyricsPlainFallback = null
+        lyricsAvailable = false
+        hideLyricsPreview(animate = false)
     }
 
     // ─────────────────────────────────────────────
@@ -2116,7 +2306,6 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             binding.accountEmailText.text = AccountManager.getEmail(this)
         }
         binding.likeBtn.isVisible    = authed
-        binding.dislikeBtn.isVisible = authed
     }
 
 private fun showLoginWebView() {
@@ -2234,7 +2423,6 @@ private fun showLoginWebView() {
         val accent = currentTheme.accentColor
         val dim    = Color.argb(100, 255, 255, 255)
         binding.likeBtn.setColorFilter(if (rating == "LIKE") accent else dim)
-        binding.dislikeBtn.setColorFilter(if (rating == "DISLIKE") accent else dim)
         binding.albumPageLikeBtn.setColorFilter(if (rating == "LIKE") accent else dim)
     }
 
