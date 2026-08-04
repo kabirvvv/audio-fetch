@@ -13,6 +13,11 @@
         android:layout_height="match_parent"
         android:background="@color/bg_deep" />
 
+    <com.audiofetch.SwipeNavContainer
+        android:id="@+id/swipeNavContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <LinearLayout
         android:id="@+id/searchContainer"
         android:layout_width="match_parent"
@@ -198,7 +203,41 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="56dp">
+            android:paddingTop="48dp">
+
+            <LinearLayout
+                android:id="@+id/homeHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingBottom="12dp">
+
+                <ImageButton
+                    android:id="@+id/homeHeaderSettingsBtn"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_menu_dots"
+                    android:tint="@color/icon_dim"
+                    android:contentDescription="Settings" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AudioFetch"
+                    android:textColor="@color/text_label"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.15"
+                    android:fontFamily="sans-serif-medium" />
+
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/homeGreeting"
@@ -378,41 +417,6 @@
                     android:overScrollMode="never"
                     android:scrollbars="none"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/homeFooter"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="24dp"
-                android:paddingTop="24dp"
-                android:paddingBottom="32dp">
-
-                <ImageButton
-                    android:id="@+id/homeFooterSettingsBtn"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_menu_dots"
-                    android:tint="@color/icon_dim"
-                    android:contentDescription="Settings" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="AudioFetch"
-                    android:textColor="@color/text_label"
-                    android:textSize="11sp"
-                    android:letterSpacing="0.15"
-                    android:fontFamily="sans-serif-medium" />
-
             </LinearLayout>
 
         </LinearLayout>
@@ -627,6 +631,8 @@
 
     </LinearLayout>
 
+    </com.audiofetch.SwipeNavContainer>
+
     <LinearLayout
         android:id="@+id/miniPlayer"
         android:layout_width="match_parent"
@@ -820,7 +826,7 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="24dp"
                 android:paddingTop="56dp"
-                android:paddingBottom="32dp">
+                android:paddingBottom="40dp">
 
                 <View
                     android:layout_width="40dp"
@@ -905,7 +911,9 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:gravity="center_vertical">
+                            android:gravity="center_vertical"
+                            android:paddingStart="36dp"
+                            android:paddingEnd="36dp">
 
                             <TextView
                                 android:id="@+id/currentTime"
@@ -932,6 +940,17 @@
                                 android:fontFamily="monospace"
                                 android:gravity="end" />
                         </LinearLayout>
+
+                        <ImageButton
+                            android:id="@+id/likeBtn"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center_vertical|start"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:src="@drawable/ic_heart"
+                            android:tint="@color/icon_faint"
+                            android:visibility="gone"
+                            android:contentDescription="Like" />
 
                         <ImageButton
                             android:id="@+id/downloadBtn"
@@ -962,7 +981,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginBottom="32dp">
+                    android:layout_marginBottom="28dp">
 
                     <ImageButton
                         android:id="@+id/playlistBtn"
@@ -971,7 +990,7 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_playlist"
                         android:tint="@color/icon_faint"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="20dp"
                         android:contentDescription="Queue" />
 
                     <ImageButton
@@ -981,7 +1000,7 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_skip_prev"
                         android:tint="@color/icon_high"
-                        android:layout_marginEnd="8dp"
+                        android:layout_marginEnd="12dp"
                         android:contentDescription="Previous" />
 
                     <FrameLayout
@@ -989,7 +1008,7 @@
                         android:layout_width="72dp"
                         android:layout_height="72dp"
                         android:background="@drawable/bg_play_button"
-                        android:layout_marginHorizontal="8dp"
+                        android:layout_marginHorizontal="12dp"
                         android:clickable="true"
                         android:focusable="true">
 
@@ -1020,50 +1039,74 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_skip_next"
                         android:tint="@color/icon_high"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="12dp"
                         android:contentDescription="Next" />
 
-                    <ImageButton
+                    <FrameLayout
                         android:id="@+id/repeatBtn"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_repeat"
-                        android:tint="@color/icon_faint"
-                        android:layout_marginStart="16dp"
-                        android:contentDescription="Repeat" />
+                        android:layout_marginStart="20dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Repeat / Shuffle">
+
+                        <ImageView
+                            android:id="@+id/repeatIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_repeat"
+                            android:tint="@color/icon_faint" />
+
+                        <ImageView
+                            android:id="@+id/shuffleIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_shuffle"
+                            android:tint="@color/icon_faint"
+                            android:visibility="gone"
+                            android:alpha="0" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/lyricsPreviewSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_lyrics_preview"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp"
+                    android:layout_marginBottom="8dp"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <TextView
+                        android:id="@+id/lyricsPreviewText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:text="Lyrics available"
+                        android:textColor="@color/text_low"
+                        android:textSize="13sp" />
 
                     <ImageButton
-                        android:id="@+id/lyricsBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:id="@+id/lyricsPreviewExpandBtn"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="12dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_lyrics"
-                        android:tint="@color/icon_dim"
-                        android:alpha="0.5"
-                        android:contentDescription="Lyrics" />
-
-                    <ImageButton
-                        android:id="@+id/dislikeBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_thumb_down"
                         android:tint="@color/icon_faint"
-                        android:visibility="gone"
-                        android:layout_marginStart="8dp"
-                        android:contentDescription="Dislike" />
+                        android:contentDescription="Open lyrics" />
 
-                    <ImageButton
-                        android:id="@+id/likeBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_thumb_up"
-                        android:tint="@color/icon_faint"
-                        android:visibility="gone"
-                        android:layout_marginStart="4dp"
-                        android:contentDescription="Like" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -1619,21 +1662,12 @@
                     android:gravity="center_vertical"
                     android:layout_marginBottom="20dp">
 
-                    <ImageButton
-                        android:id="@+id/albumPageShuffleBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_shuffle"
-                        android:tint="@color/icon_faint"
-                        android:layout_marginEnd="20dp"
-                        android:contentDescription="Shuffle" />
-
                     <FrameLayout
                         android:id="@+id/albumPagePlayBtn"
                         android:layout_width="58dp"
                         android:layout_height="58dp"
                         android:background="@drawable/bg_play_button_soft"
+                        android:layout_marginEnd="20dp"
                         android:clickable="true"
                         android:focusable="true">
 
@@ -1657,22 +1691,40 @@
                             android:contentDescription="Pause" />
                     </FrameLayout>
 
-                    <ImageButton
+                    <FrameLayout
                         android:id="@+id/albumPageRepeatBtn"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_repeat"
-                        android:tint="@color/icon_faint"
-                        android:layout_marginStart="20dp"
-                        android:contentDescription="Repeat" />
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Repeat / Shuffle">
+
+                        <ImageView
+                            android:id="@+id/albumPageRepeatIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_repeat"
+                            android:tint="@color/icon_faint" />
+
+                        <ImageView
+                            android:id="@+id/albumPageShuffleIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_shuffle"
+                            android:tint="@color/icon_faint"
+                            android:visibility="gone"
+                            android:alpha="0" />
+                    </FrameLayout>
 
                     <ImageButton
                         android:id="@+id/albumPageLikeBtn"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_thumb_up"
+                        android:src="@drawable/ic_heart"
                         android:tint="@color/icon_faint"
                         android:layout_marginStart="20dp"
                         android:contentDescription="Like" />
