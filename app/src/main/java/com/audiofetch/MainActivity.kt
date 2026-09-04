@@ -1414,6 +1414,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         binding.miniPlayPauseBtn.setImageResource(
             if (playing) R.drawable.ic_pause else R.drawable.ic_play
         )
+        binding.seekBar.isPlaying = playing
     }
 
     private fun updateProgressUI() {
