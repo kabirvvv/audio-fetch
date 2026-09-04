@@ -9,7 +9,33 @@ data class VibeTheme(
     val accentColor: Int,
     val vibeColor: Int,
     val desc: String
-)
+) {
+    // M3 Expressive Computed Tonal Colors
+    val surfaceContainerColor: Int
+        get() = vibeColor
+
+    val primaryContainerColor: Int
+        get() = Color.argb(
+            0x26, // ~15% alpha container tone
+            Color.red(accentColor),
+            Color.green(accentColor),
+            Color.blue(accentColor)
+        )
+
+    val onPrimaryColor: Int
+        get() = if (isLightColor(accentColor)) Color.BLACK else Color.WHITE
+
+    val onSurfaceColor: Int
+        get() = Color.WHITE
+
+    val onSurfaceVariantColor: Int
+        get() = Color.argb(153, 255, 255, 255) // 60% alpha white
+
+    private fun isLightColor(color: Int): Boolean {
+        val darkness = 1 - (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+        return darkness < 0.5
+    }
+}
 
 object VibeThemes {
     val all = listOf(
