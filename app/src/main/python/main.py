@@ -567,27 +567,20 @@ def _resolve_with_client(target_url: str, client: str, fmt: str) -> dict | None:
 
 
 def _parallel_resolve(target_url: str, fmt: str) -> dict | None:
-    """Resolve a stream URL using primary-first, then parallel fallback racing.
+    """Resolve a stream URL by racing ALL clients concurrently in parallel from start.
 
-    1. Try _PRIMARY_CLIENT synchronously.
-    2. On failure, submit ALL _FALLBACK_CLIENTS concurrently via ThreadPoolExecutor.
-    3. Return the first successful result immediately (cancel remaining futures).
+    Races _PRIMARY_CLIENT + _FALLBACK_CLIENTS simultaneously via ThreadPoolExecutor.
+    Returns the first successful result immediately and cancels remaining futures.
     """
-    # Step 1: Primary client (synchronous — avoids thread overhead for the common case)
-    result = _resolve_with_client(target_url, _PRIMARY_CLIENT, fmt)
-    if result:
-        return result
-
-    # Step 2: Race all fallback clients in parallel
-    with ThreadPoolExecutor(max_workers=len(_FALLBACK_CLIENTS)) as pool:
+    all_clients = [_PRIMARY_CLIENT] + list(_FALLBACK_CLIENTS)
+    with ThreadPoolExecutor(max_workers=len(all_clients)) as pool:
         futures = {
             pool.submit(_resolve_with_client, target_url, client, fmt): client
-            for client in _FALLBACK_CLIENTS
+            for client in all_clients
         }
         for future in as_completed(futures):
             result = future.result()
             if result:
-                # Cancel remaining futures (best-effort, they may already be running)
                 for f in futures:
                     f.cancel()
                 return result
