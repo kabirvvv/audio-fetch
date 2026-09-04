@@ -5,24 +5,20 @@
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_deep">
+    android:background="#020503">
 
     <View
         android:id="@+id/bgVibe"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/bg_deep" />
-
-    <com.audiofetch.SwipeNavContainer
-        android:id="@+id/swipeNavContainer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:background="#020503" />
 
     <LinearLayout
         android:id="@+id/searchContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
+        android:paddingBottom="120dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -43,7 +39,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
                     android:text="AudioFetch"
-                    android:textColor="@color/text_label"
+                    android:textColor="#33FFFFFF"
                     android:textSize="11sp"
                     android:letterSpacing="0.15"
                     android:fontFamily="sans-serif-medium" />
@@ -55,7 +51,7 @@
                     android:layout_gravity="center_vertical|end"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_menu_dots"
-                    android:tint="@color/icon_dim"
+                    android:tint="#80FFFFFF"
                     android:contentDescription="Settings" />
             </FrameLayout>
 
@@ -70,8 +66,8 @@
                     android:layout_height="56dp"
                     android:background="@drawable/bg_input"
                     android:hint="@string/hint_search"
-                    android:textColorHint="@color/text_faint"
-                    android:textColor="@color/text_high"
+                    android:textColorHint="#40FFFFFF"
+                    android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     android:letterSpacing="0.05"
                     android:paddingStart="24dp"
@@ -95,7 +91,7 @@
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_search"
-                    android:tint="@color/accent"
+                    android:tint="#00FFA2"
                     android:contentDescription="Stream" />
             </LinearLayout>
         </LinearLayout>
@@ -112,7 +108,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:indeterminate="true"
-                android:indeterminateTint="@color/accent"
+                android:indeterminateTint="#00FFA2"
                 android:visibility="gone"
                 android:layout_marginBottom="8dp" />
 
@@ -121,71 +117,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="11sp"
-                android:textColor="@color/text_dim"
+                android:textColor="#60FFFFFF"
                 android:gravity="center"
                 android:letterSpacing="0.05" />
         </LinearLayout>
-
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/searchResultsScroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:overScrollMode="never"
-            android:scrollbars="none"
-            android:clipToPadding="false"
-            android:paddingBottom="120dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingTop="8dp">
-
-                <TextView
-                    android:id="@+id/searchSectionsLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="20dp"
-                    android:paddingBottom="4dp"
-                    android:text="Search recommendations"
-                    android:textColor="@color/text_high"
-                    android:textSize="15sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/searchSongsLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="20dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="10dp"
-                    android:text="Songs"
-                    android:textColor="@color/text_high"
-                    android:textSize="15sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:visibility="gone" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/searchSongsRecycler"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false"
-                    android:overScrollMode="never"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
-                <!-- Albums / Singles shelves get injected here at runtime, same
-                     mechanism as homeShelvesContainer on the Home tab. -->
-                <LinearLayout
-                    android:id="@+id/searchShelvesContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-            </LinearLayout>
-        </androidx.core.widget.NestedScrollView>
-
 
     </LinearLayout>
 
@@ -203,56 +138,22 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="48dp">
-
-            <LinearLayout
-                android:id="@+id/homeHeader"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="20dp"
-                android:paddingBottom="12dp">
-
-                <ImageButton
-                    android:id="@+id/homeHeaderSettingsBtn"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_menu_dots"
-                    android:tint="@color/icon_dim"
-                    android:contentDescription="Settings" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="AudioFetch"
-                    android:textColor="@color/text_label"
-                    android:textSize="11sp"
-                    android:letterSpacing="0.15"
-                    android:fontFamily="sans-serif-medium" />
-
-            </LinearLayout>
+            android:paddingTop="56dp">
 
             <TextView
                 android:id="@+id/homeGreeting"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="20dp"
-                android:paddingBottom="24dp"
+                android:paddingBottom="16dp"
                 android:text="Good evening"
-                android:textColor="@color/text_high"
+                android:textColor="#FFFFFF"
                 android:textSize="22sp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.02" />
 
             <LinearLayout
-                android:id="@+id/libraryAlbumsSection"
+                android:id="@+id/recentlyPlayedSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -263,19 +164,19 @@
                     android:layout_height="wrap_content"
                     android:paddingHorizontal="20dp"
                     android:paddingBottom="10dp"
-                    android:text="Your Albums"
-                    android:textColor="@color/text_high"
+                    android:text="Recently Played"
+                    android:textColor="#FFFFFF"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium" />
 
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/libraryAlbumsRecycler"
+                    android:id="@+id/recentlyPlayedRecycler"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:paddingBottom="28dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="20dp"
                     android:clipToPadding="false"
                     android:overScrollMode="never"
                     android:scrollbars="none"
@@ -293,25 +194,25 @@
                 <View
                     android:layout_width="120dp"
                     android:layout_height="14dp"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="10dp"
                     android:background="@drawable/bg_shimmer_pill" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="28dp">
+                    android:layout_marginBottom="24dp">
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="10dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="10dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
@@ -323,25 +224,25 @@
                 <View
                     android:layout_width="90dp"
                     android:layout_height="14dp"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="10dp"
                     android:background="@drawable/bg_shimmer_pill" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="28dp">
+                    android:layout_marginBottom="24dp">
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="10dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="10dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
@@ -353,7 +254,7 @@
                 <View
                     android:layout_width="140dp"
                     android:layout_height="14dp"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="10dp"
                     android:background="@drawable/bg_shimmer_pill" />
 
                 <LinearLayout
@@ -365,13 +266,13 @@
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="10dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
                         android:layout_width="140dp"
                         android:layout_height="140dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginEnd="10dp"
                         android:background="@drawable/bg_shimmer_card" />
 
                     <View
@@ -401,7 +302,7 @@
                     android:paddingHorizontal="20dp"
                     android:paddingBottom="10dp"
                     android:text="Moods &amp; Genres"
-                    android:textColor="@color/text_high"
+                    android:textColor="#FFFFFF"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium" />
 
@@ -410,9 +311,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:paddingBottom="28dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="20dp"
                     android:clipToPadding="false"
                     android:overScrollMode="never"
                     android:scrollbars="none"
@@ -427,7 +328,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="@color/bg_deep"
+        android:background="#020503"
         android:paddingBottom="120dp"
         android:visibility="gone">
 
@@ -441,7 +342,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
                 android:text="Library"
-                android:textColor="@color/text_high"
+                android:textColor="#FFFFFF"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -453,7 +354,7 @@
                 android:layout_centerVertical="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_close"
-                android:tint="@color/icon_faint"
+                android:tint="#60FFFFFF"
                 android:contentDescription="Close library" />
         </RelativeLayout>
 
@@ -479,7 +380,7 @@
                     android:gravity="center"
                     android:text="Downloads"
                     android:textSize="13sp"
-                    android:textColor="@color/accent" />
+                    android:textColor="#00FFA2" />
 
                 <TextView
                     android:id="@+id/libTabLocal"
@@ -489,7 +390,7 @@
                     android:gravity="center"
                     android:text="Local"
                     android:textSize="13sp"
-                    android:textColor="@color/text_faint" />
+                    android:textColor="#40FFFFFF" />
 
                 <TextView
                     android:id="@+id/libTabHistory"
@@ -499,14 +400,14 @@
                     android:gravity="center"
                     android:text="History"
                     android:textSize="13sp"
-                    android:textColor="@color/text_faint" />
+                    android:textColor="#40FFFFFF" />
 
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="@color/divider"
+                android:background="#20FFFFFF"
                 android:layout_marginBottom="4dp" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -522,7 +423,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="@color/divider" />
+                android:background="#20FFFFFF" />
 
             <LinearLayout
                 android:id="@+id/playlistsSection"
@@ -541,25 +442,20 @@
                         android:layout_height="wrap_content"
                         android:layout_centerVertical="true"
                         android:text="Playlists"
-                        android:textColor="@color/text_high"
+                        android:textColor="#FFFFFF"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
-                    <TextView
+                    <Button
                         android:id="@+id/newPlaylistBtn"
                         android:layout_width="wrap_content"
                         android:layout_height="32dp"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:paddingHorizontal="12dp"
-                        android:gravity="center"
                         android:text="+ New"
                         android:textSize="12sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:textColor="@color/accent"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:clickable="true"
-                        android:focusable="true" />
+                        android:textColor="#00FFA2"
+                        android:backgroundTint="@android:color/transparent" />
 
                 </RelativeLayout>
 
@@ -592,14 +488,13 @@
                 android:paddingHorizontal="8dp"
                 android:paddingBottom="4dp">
 
-                <ImageButton
+                <Button
                     android:id="@+id/backFromPlaylistBtn"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_arrow_back"
-                    android:tint="@color/icon_muted"
-                    android:contentDescription="Back to playlists" />
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="← Back"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="@android:color/transparent" />
 
                 <TextView
                     android:id="@+id/playlistDetailTitle"
@@ -607,7 +502,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:paddingHorizontal="8dp"
-                    android:textColor="@color/text_high"
+                    android:textColor="#FFFFFF"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -616,7 +511,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="@color/divider"
+                android:background="#20FFFFFF"
                 android:layout_marginBottom="4dp" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -631,16 +526,15 @@
 
     </LinearLayout>
 
-    </com.audiofetch.SwipeNavContainer>
-
     <LinearLayout
         android:id="@+id/miniPlayer"
         android:layout_width="match_parent"
         android:layout_height="64dp"
         android:layout_gravity="bottom"
-        android:layout_marginBottom="56dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginBottom="64dp"
         android:orientation="vertical"
-        android:background="@color/overlay_mini_player"
+        android:background="@drawable/bg_mini_player"
         android:elevation="16dp"
         android:visibility="gone"
         android:clickable="true"
@@ -650,7 +544,7 @@
             android:id="@+id/miniPlayerProgressLine"
             android:layout_width="0dp"
             android:layout_height="2dp"
-            android:background="@color/accent" />
+            android:background="#00FFA2" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -660,15 +554,14 @@
             android:gravity="center_vertical"
             android:paddingHorizontal="8dp">
 
-            <ImageView
+            <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/miniArt"
                 android:layout_width="44dp"
                 android:layout_height="44dp"
                 android:layout_marginEnd="10dp"
                 android:background="@drawable/bg_album_art_default"
                 android:scaleType="centerCrop"
-                android:clipToOutline="true"
-                android:outlineProvider="background"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.AudioFetch.Rounded"
                 android:contentDescription="Mini album art" />
 
             <LinearLayout
@@ -682,7 +575,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="—"
-                    android:textColor="@color/text_high"
+                    android:textColor="#FFFFFF"
                     android:textSize="13sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
@@ -694,7 +587,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text=""
-                    android:textColor="@color/text_low"
+                    android:textColor="#80FFFFFF"
                     android:textSize="11sp"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -708,7 +601,7 @@
                 android:layout_marginStart="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_play"
-                android:tint="@color/icon_high"
+                android:tint="#FFFFFF"
                 android:contentDescription="Play/Pause" />
 
         </LinearLayout>
@@ -721,7 +614,7 @@
         android:layout_height="56dp"
         android:layout_gravity="bottom"
         android:orientation="horizontal"
-        android:background="@color/overlay_bottom_nav"
+        android:background="#EE020503"
         android:elevation="8dp">
 
         <LinearLayout
@@ -738,13 +631,13 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_search"
-                android:tint="@color/icon_high" />
+                android:tint="#FFFFFF" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Search"
-                android:textColor="@color/text_high"
+                android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
 
@@ -764,13 +657,13 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_home"
-                android:tint="@color/icon_high" />
+                android:tint="#FFFFFF" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Home"
-                android:textColor="@color/text_high"
+                android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
 
@@ -789,14 +682,14 @@
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_library"
-                android:tint="@color/icon_high" />
+                android:src="@drawable/ic_playlist"
+                android:tint="#FFFFFF" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Library"
-                android:textColor="@color/text_high"
+                android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
 
@@ -809,7 +702,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="@color/bg_deep"
+        android:background="#020503"
         android:elevation="32dp"
         android:visibility="gone">
 
@@ -826,14 +719,14 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="24dp"
                 android:paddingTop="56dp"
-                android:paddingBottom="40dp">
+                android:paddingBottom="32dp">
 
                 <View
                     android:layout_width="40dp"
                     android:layout_height="4dp"
                     android:layout_gravity="center_horizontal"
                     android:layout_marginBottom="20dp"
-                    android:background="@color/text_faint"
+                    android:background="#40FFFFFF"
                     android:outlineProvider="background"
                     android:clipToOutline="true" />
 
@@ -851,15 +744,14 @@
                         android:background="@drawable/bg_glow"
                         android:alpha="0" />
 
-                    <ImageView
+                    <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/albumArt"
-                        android:layout_width="220dp"
-                        android:layout_height="220dp"
+                        android:layout_width="230dp"
+                        android:layout_height="230dp"
                         android:layout_gravity="center"
                         android:background="@drawable/bg_album_art_default"
                         android:scaleType="centerCrop"
-                        android:clipToOutline="true"
-                        android:outlineProvider="background"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.AudioFetch.Container"
                         android:elevation="8dp"
                         android:contentDescription="Album art" />
                 </FrameLayout>
@@ -875,7 +767,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Vibe Check"
-                        android:textColor="@color/text_high"
+                        android:textColor="#FFFFFF"
                         android:textSize="22sp"
                         android:fontFamily="sans-serif-medium"
                         android:letterSpacing="-0.02"
@@ -889,7 +781,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="Ready to load…"
-                        android:textColor="@color/text_low"
+                        android:textColor="#80FFFFFF"
                         android:textSize="13sp"
                         android:maxLines="1"
                         android:ellipsize="end"
@@ -911,9 +803,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:paddingStart="36dp"
-                            android:paddingEnd="36dp">
+                            android:gravity="center_vertical">
 
                             <TextView
                                 android:id="@+id/currentTime"
@@ -921,7 +811,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="0:00"
-                                android:textColor="@color/text_low"
+                                android:textColor="#80FFFFFF"
                                 android:textSize="11sp"
                                 android:fontFamily="monospace" />
 
@@ -935,22 +825,11 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="0:00"
-                                android:textColor="@color/text_low"
+                                android:textColor="#80FFFFFF"
                                 android:textSize="11sp"
                                 android:fontFamily="monospace"
                                 android:gravity="end" />
                         </LinearLayout>
-
-                        <ImageButton
-                            android:id="@+id/likeBtn"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:layout_gravity="center_vertical|start"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_heart"
-                            android:tint="@color/icon_faint"
-                            android:visibility="gone"
-                            android:contentDescription="Like" />
 
                         <ImageButton
                             android:id="@+id/downloadBtn"
@@ -959,7 +838,7 @@
                             android:layout_gravity="center_vertical|end"
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:src="@drawable/ic_download"
-                            android:tint="@color/accent"
+                            android:tint="#00FFA2"
                             android:visibility="gone"
                             android:contentDescription="Download current track" />
                     </FrameLayout>
@@ -981,7 +860,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginBottom="28dp">
+                    android:layout_marginBottom="32dp">
 
                     <ImageButton
                         android:id="@+id/playlistBtn"
@@ -989,8 +868,8 @@
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_playlist"
-                        android:tint="@color/icon_faint"
-                        android:layout_marginEnd="20dp"
+                        android:tint="#60FFFFFF"
+                        android:layout_marginEnd="16dp"
                         android:contentDescription="Queue" />
 
                     <ImageButton
@@ -999,8 +878,8 @@
                         android:layout_height="48dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_skip_prev"
-                        android:tint="@color/icon_high"
-                        android:layout_marginEnd="12dp"
+                        android:tint="#FFFFFF"
+                        android:layout_marginEnd="8dp"
                         android:contentDescription="Previous" />
 
                     <FrameLayout
@@ -1008,7 +887,7 @@
                         android:layout_width="72dp"
                         android:layout_height="72dp"
                         android:background="@drawable/bg_play_button"
-                        android:layout_marginHorizontal="12dp"
+                        android:layout_marginHorizontal="8dp"
                         android:clickable="true"
                         android:focusable="true">
 
@@ -1018,7 +897,7 @@
                             android:layout_height="32dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_play"
-                            android:tint="@color/bg_deep"
+                            android:tint="#020503"
                             android:contentDescription="Play" />
 
                         <ImageView
@@ -1027,7 +906,7 @@
                             android:layout_height="32dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_pause"
-                            android:tint="@color/bg_deep"
+                            android:tint="#020503"
                             android:visibility="gone"
                             android:contentDescription="Pause" />
                     </FrameLayout>
@@ -1038,75 +917,51 @@
                         android:layout_height="48dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_skip_next"
-                        android:tint="@color/icon_high"
-                        android:layout_marginStart="12dp"
+                        android:tint="#FFFFFF"
+                        android:layout_marginStart="8dp"
                         android:contentDescription="Next" />
 
-                    <FrameLayout
+                    <ImageButton
                         android:id="@+id/repeatBtn"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:layout_marginStart="20dp"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:contentDescription="Repeat / Shuffle">
-
-                        <ImageView
-                            android:id="@+id/repeatIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_repeat"
-                            android:tint="@color/icon_faint" />
-
-                        <ImageView
-                            android:id="@+id/shuffleIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_shuffle"
-                            android:tint="@color/icon_faint"
-                            android:visibility="gone"
-                            android:alpha="0" />
-                    </FrameLayout>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/lyricsPreviewSection"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/bg_lyrics_preview"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="14dp"
-                    android:layout_marginBottom="8dp"
-                    android:visibility="gone"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <TextView
-                        android:id="@+id/lyricsPreviewText"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:text="Lyrics available"
-                        android:textColor="@color/text_low"
-                        android:textSize="13sp" />
+                        android:src="@drawable/ic_repeat"
+                        android:tint="#60FFFFFF"
+                        android:layout_marginStart="16dp"
+                        android:contentDescription="Repeat" />
 
                     <ImageButton
-                        android:id="@+id/lyricsPreviewExpandBtn"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:layout_marginStart="12dp"
+                        android:id="@+id/lyricsBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_lyrics"
-                        android:tint="@color/icon_faint"
-                        android:contentDescription="Open lyrics" />
+                        android:tint="#80FFFFFF"
+                        android:alpha="0.5"
+                        android:contentDescription="Lyrics" />
 
+                    <ImageButton
+                        android:id="@+id/dislikeBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_thumb_down"
+                        android:tint="#60FFFFFF"
+                        android:visibility="gone"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="Dislike" />
+
+                    <ImageButton
+                        android:id="@+id/likeBtn"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_thumb_up"
+                        android:tint="#60FFFFFF"
+                        android:visibility="gone"
+                        android:layout_marginStart="4dp"
+                        android:contentDescription="Like" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -1141,7 +996,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Up Next"
-                    android:textColor="@color/text_high"
+                    android:textColor="#FFFFFF"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.05" />
@@ -1151,7 +1006,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="CLEAR"
-                    android:textColor="@color/text_dim"
+                    android:textColor="#60FFFFFF"
                     android:textSize="10sp"
                     android:letterSpacing="0.1"
                     android:padding="8dp"
@@ -1173,7 +1028,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_close"
-                    android:tint="@color/icon_dim"
+                    android:tint="#80FFFFFF"
                     android:contentDescription="Close" />
             </LinearLayout>
 
@@ -1184,6 +1039,72 @@
                 android:layout_weight="1"
                 android:scrollbars="none"
                 android:overScrollMode="never" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/searchSheet"
+        android:layout_width="match_parent"
+        android:layout_height="520dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_bottom_sheet"
+        android:translationY="999dp"
+        android:elevation="36dp"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/searchSheetTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Results"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05" />
+
+                <ImageButton
+                    android:id="@+id/closeSearchSheetBtn"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_close"
+                    android:tint="#80FFFFFF"
+                    android:contentDescription="Close" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/searchSheetProgress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_horizontal"
+                android:indeterminate="true"
+                android:indeterminateTint="#00FFA2"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/searchResultsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp" />
+
         </LinearLayout>
     </FrameLayout>
 
@@ -1221,7 +1142,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="SETTINGS"
-                        android:textColor="@color/text_high"
+                        android:textColor="#FFFFFF"
                         android:textSize="12sp"
                         android:letterSpacing="0.15"
                         android:fontFamily="sans-serif-medium" />
@@ -1232,7 +1153,7 @@
                         android:layout_height="36dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_close"
-                        android:tint="@color/icon_dim"
+                        android:tint="#80FFFFFF"
                         android:contentDescription="Close settings" />
                 </LinearLayout>
 
@@ -1240,7 +1161,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="EQUALIZER"
-                    android:textColor="@color/text_dim"
+                    android:textColor="#60FFFFFF"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1262,10 +1183,10 @@
                         android:layout_height="wrap_content" 
                         android:orientation="horizontal" 
                         android:layout_marginBottom="4dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Lows" android:textColor="@color/text_secondary" android:textSize="12sp" />
-                        <TextView android:id="@+id/eqLowVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="@color/accent" android:textSize="11sp" android:fontFamily="monospace" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Lows" android:textColor="#CCFFFFFF" android:textSize="12sp" />
+                        <TextView android:id="@+id/eqLowVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
-                    <SeekBar android:id="@+id/eqLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="@color/accent" android:thumbTint="@color/accent" />
+                    <SeekBar android:id="@+id/eqLow" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
                 <LinearLayout 
@@ -1278,10 +1199,10 @@
                         android:layout_height="wrap_content" 
                         android:orientation="horizontal" 
                         android:layout_marginBottom="4dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Mids" android:textColor="@color/text_secondary" android:textSize="12sp" />
-                        <TextView android:id="@+id/eqMidVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="@color/accent" android:textSize="11sp" android:fontFamily="monospace" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Mids" android:textColor="#CCFFFFFF" android:textSize="12sp" />
+                        <TextView android:id="@+id/eqMidVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
-                    <SeekBar android:id="@+id/eqMid" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="@color/accent" android:thumbTint="@color/accent" />
+                    <SeekBar android:id="@+id/eqMid" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
                 <LinearLayout 
@@ -1294,17 +1215,17 @@
                         android:layout_height="wrap_content" 
                         android:orientation="horizontal" 
                         android:layout_marginBottom="4dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Highs" android:textColor="@color/text_secondary" android:textSize="12sp" />
-                        <TextView android:id="@+id/eqHighVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="@color/accent" android:textSize="11sp" android:fontFamily="monospace" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Highs" android:textColor="#CCFFFFFF" android:textSize="12sp" />
+                        <TextView android:id="@+id/eqHighVal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0dB" android:textColor="#00FFA2" android:textSize="11sp" android:fontFamily="monospace" />
                     </LinearLayout>
-                    <SeekBar android:id="@+id/eqHigh" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="@color/accent" android:thumbTint="@color/accent" />
+                    <SeekBar android:id="@+id/eqHigh" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="24" android:progress="12" android:progressTint="#00FFA2" android:thumbTint="#00FFA2" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="SLEEP TIMER"
-                    android:textColor="@color/text_dim"
+                    android:textColor="#60FFFFFF"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1320,7 +1241,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="THEME"
-                    android:textColor="@color/text_dim"
+                    android:textColor="#60FFFFFF"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1336,7 +1257,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="ACCOUNT"
-                    android:textColor="@color/text_dim"
+                    android:textColor="#60FFFFFF"
                     android:textSize="9sp"
                     android:letterSpacing="0.15"
                     android:layout_marginBottom="12dp" />
@@ -1351,21 +1272,15 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Connect your YouTube Music account for personalised recommendations."
-                        android:textColor="@color/text_low"
+                        android:textColor="#80FFFFFF"
                         android:textSize="12sp"
                         android:layout_marginBottom="12dp" />
-                    <TextView
+                    <Button
                         android:id="@+id/connectAccountBtn"
                         android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:gravity="center"
+                        android:layout_height="wrap_content"
                         android:text="Sign in with Google"
-                        android:textSize="13sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:textColor="@color/text_on_accent"
-                        android:background="@drawable/bg_button_filled"
-                        android:clickable="true"
-                        android:focusable="true" />
+                        android:textSize="13sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -1379,7 +1294,7 @@
                         android:id="@+id/accountNameText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/text_high"
+                        android:textColor="#FFFFFF"
                         android:textSize="14sp"
                         android:fontFamily="sans-serif-medium"
                         android:layout_marginBottom="2dp" />
@@ -1387,21 +1302,15 @@
                         android:id="@+id/accountEmailText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/text_low"
+                        android:textColor="#80FFFFFF"
                         android:textSize="12sp"
                         android:layout_marginBottom="12dp" />
-                    <TextView
+                    <Button
                         android:id="@+id/signOutBtn"
                         android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:gravity="center"
+                        android:layout_height="wrap_content"
                         android:text="Sign out"
-                        android:textSize="13sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:textColor="@color/accent"
-                        android:background="@drawable/bg_button_outline"
-                        android:clickable="true"
-                        android:focusable="true" />
+                        android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>
@@ -1411,7 +1320,7 @@
         android:id="@+id/scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/scrim"
+        android:background="#000000"
         android:alpha="0"
         android:visibility="gone"
         android:clickable="true"
@@ -1422,7 +1331,7 @@
         android:id="@+id/lyricsSheet"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/surface_elevated"
+        android:background="#FF0A0A0A"
         android:visibility="gone"
         android:elevation="44dp">
 
@@ -1434,7 +1343,7 @@
             android:layout_marginTop="16dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_arrow_back"
-            android:tint="@color/icon_muted"
+            android:tint="#99FFFFFF"
             android:contentDescription="Close lyrics"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -1447,7 +1356,7 @@
             android:layout_marginEnd="64dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_low"
+            android:textColor="#80FFFFFF"
             android:textSize="13sp"
             app:layout_constraintBottom_toBottomOf="@id/lyricsBackBtn"
             app:layout_constraintEnd_toEndOf="parent"
@@ -1508,7 +1417,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text=""
-                    android:textColor="@color/text_high"
+                    android:textColor="#FFFFFF"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
@@ -1521,7 +1430,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_close"
-                    android:tint="@color/icon_dim"
+                    android:tint="#80FFFFFF"
                     android:contentDescription="Close" />
             </LinearLayout>
 
@@ -1531,7 +1440,7 @@
                 android:layout_height="24dp"
                 android:layout_gravity="center_horizontal"
                 android:indeterminate="true"
-                android:indeterminateTint="@color/accent"
+                android:indeterminateTint="#00FFA2"
                 android:visibility="gone"
                 android:layout_marginBottom="8dp" />
 
@@ -1547,209 +1456,5 @@
 
         </LinearLayout>
     </FrameLayout>
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/albumPage"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/bg_deep"
-        android:visibility="gone"
-        android:elevation="20dp">
-
-        <!-- Experimental: blurred, zoomed-in album art behind the real cover.
-             Blur only applies on API 31+ (RenderEffect); older devices just get
-             the dimmed/zoomed image with no blur. Easy to rip out later. -->
-        <ImageView
-            android:id="@+id/albumPageBgArt"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:scaleType="centerCrop"
-            android:alpha="0.45"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:background="@color/scrim"
-            android:alpha="0.4"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <ImageButton
-            android:id="@+id/albumPageBackBtn"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="16dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_arrow_back"
-            android:tint="@color/icon_high"
-            android:contentDescription="Back"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <androidx.core.widget.NestedScrollView
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:overScrollMode="never"
-            android:scrollbars="none"
-            android:clipToPadding="false"
-            android:paddingBottom="140dp"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:paddingTop="72dp"
-                android:paddingHorizontal="32dp">
-
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="220dp"
-                    android:layout_height="220dp"
-                    android:layout_marginBottom="20dp"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="14dp"
-                    app:strokeWidth="0dp"
-                    app:cardBackgroundColor="@color/bg_deep">
-
-                    <ImageView
-                        android:id="@+id/albumPageArt"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:scaleType="centerCrop"
-                        android:background="@drawable/bg_album_art_default"
-                        android:contentDescription="Album art" />
-
-                </com.google.android.material.card.MaterialCardView>
-
-                <TextView
-                    android:id="@+id/albumPageTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:textColor="@color/text_high"
-                    android:textSize="20sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:maxLines="2"
-                    android:ellipsize="end"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:id="@+id/albumPageArtist"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:textColor="@color/text_low"
-                    android:textSize="14sp"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:layout_marginBottom="24dp" />
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="20dp">
-
-                    <FrameLayout
-                        android:id="@+id/albumPagePlayBtn"
-                        android:layout_width="58dp"
-                        android:layout_height="58dp"
-                        android:background="@drawable/bg_play_button_soft"
-                        android:layout_marginEnd="20dp"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <ImageView
-                            android:id="@+id/albumPagePlayIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_play"
-                            android:tint="@color/bg_deep"
-                            android:contentDescription="Play" />
-
-                        <ImageView
-                            android:id="@+id/albumPagePauseIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_pause"
-                            android:tint="@color/bg_deep"
-                            android:visibility="gone"
-                            android:contentDescription="Pause" />
-                    </FrameLayout>
-
-                    <FrameLayout
-                        android:id="@+id/albumPageRepeatBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:contentDescription="Repeat / Shuffle">
-
-                        <ImageView
-                            android:id="@+id/albumPageRepeatIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_repeat"
-                            android:tint="@color/icon_faint" />
-
-                        <ImageView
-                            android:id="@+id/albumPageShuffleIcon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_shuffle"
-                            android:tint="@color/icon_faint"
-                            android:visibility="gone"
-                            android:alpha="0" />
-                    </FrameLayout>
-
-                    <ImageButton
-                        android:id="@+id/albumPageLikeBtn"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_heart"
-                        android:tint="@color/icon_faint"
-                        android:layout_marginStart="20dp"
-                        android:contentDescription="Like" />
-                </LinearLayout>
-
-                <ProgressBar
-                    android:id="@+id/albumPageProgress"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:indeterminate="true"
-                    android:indeterminateTint="@color/accent"
-                    android:visibility="gone"
-                    android:layout_marginBottom="12dp" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/albumPageTrackList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false"
-                    android:overScrollMode="never"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
-            </LinearLayout>
-        </androidx.core.widget.NestedScrollView>
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
