@@ -1,4 +1,3 @@
-
 import yt_dlp
 import os
 import re
@@ -6,6 +5,9 @@ import json
 import time
 import threading
 import urllib.request
+from collections import OrderedDict
+from urllib.parse import urlparse, parse_qs
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from mutagen.mp4 import MP4, MP4Cover
 
@@ -62,6 +64,73 @@ def _write_cache(key: str, items) -> None:
                 json.dump({"updated": time.time(), "items": items}, f)
     except Exception:
         pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stream URL cache  (TTL + LRU, in-memory, thread-safe)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _StreamUrlCache:
+    """Thread-safe LRU cache for resolved stream URLs.
+
+    - Max 500 entries (oldest evicted on overflow).
+    - TTL derived from YouTube CDN URL's `expire` query parameter.
+    - Falls back to 6-hour default TTL when `expire` is absent.
+    """
+
+    _MAX_SIZE = 500
+    _DEFAULT_TTL = 6 * 3600  # 6 hours fallback
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._store: OrderedDict[str, dict] = OrderedDict()
+
+    @staticmethod
+    def _extract_expire(url: str) -> float:
+        """Parse the `expire` epoch timestamp from a YouTube CDN URL."""
+        try:
+            qs = parse_qs(urlparse(url).query)
+            expire_vals = qs.get("expire")
+            if expire_vals:
+                return float(expire_vals[0])
+        except Exception:
+            pass
+        return time.time() + _StreamUrlCache._DEFAULT_TTL
+
+    def get(self, key: str) -> dict | None:
+        """Return cached stream data dict if key exists and URL not expired, else None."""
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            if time.time() >= entry.get("_expires_at", 0):
+                # Expired — evict
+                self._store.pop(key, None)
+                return None
+            # Move to end (most recently used)
+            self._store.move_to_end(key)
+            return entry
+
+    def put(self, key: str, data: dict) -> None:
+        """Insert or update a stream data dict. TTL extracted from data['url']."""
+        expires_at = self._extract_expire(data.get("url", ""))
+        entry = {**data, "_expires_at": expires_at}
+        with self._lock:
+            if key in self._store:
+                self._store.move_to_end(key)
+                self._store[key] = entry
+            else:
+                self._store[key] = entry
+                if len(self._store) > self._MAX_SIZE:
+                    self._store.popitem(last=False)  # evict oldest
+
+    def invalidate(self, key: str) -> None:
+        """Remove a specific key (self-heal on 403 / rejection)."""
+        with self._lock:
+            self._store.pop(key, None)
+
+
+_stream_cache = _StreamUrlCache()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -432,67 +501,174 @@ def search_tracks(query: str, limit: int = 15) -> str:
     except Exception as ex:
         return f"ERROR: {str(ex)}"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Stream resolution: client helpers & parallel fallback racing
+# ─────────────────────────────────────────────────────────────────────────────
 
-def get_stream_url(url: str) -> str:
-    """Extract a direct streamable audio URL without downloading."""
+# Client identities ordered by typical success rate.
+# Primary is tried first alone; fallbacks are raced in parallel on failure.
+_PRIMARY_CLIENT = "web_remix"
+_FALLBACK_CLIENTS = ["android_vr", "tv_embedded", "ios"]
+
+_FORMAT_DEFAULT = "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio"
+
+# Network-aware quality tiers → yt-dlp format selectors
+_QUALITY_FORMATS = {
+    "AUTO":   "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+    "HIGH":   "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+    "MEDIUM": "bestaudio[abr<=128][ext=m4a]/bestaudio[abr<=128]/bestaudio",
+    "LOW":    "worstaudio[ext=m4a]/worstaudio[ext=aac]/worstaudio",
+}
+
+
+def _format_for_quality(quality: str) -> str:
+    """Return the yt-dlp format selector for a given quality tier."""
+    return _QUALITY_FORMATS.get(quality.upper(), _FORMAT_DEFAULT)
+
+
+def _resolve_with_client(target_url: str, client: str, fmt: str) -> dict | None:
+    """Attempt stream URL extraction with a specific yt-dlp player_client.
+
+    Returns a stream data dict on success, or None on any failure.
+    Designed to be safe for concurrent execution in ThreadPoolExecutor.
+    """
     try:
-        query = resolve_query(url)
-        info_opts = {
+        opts = {
             "quiet": True,
             "no_warnings": True,
-            "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
-            "format": "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+            "extractor_args": {"youtube": {"player_client": [client]}},
+            "format": fmt,
         }
-        with yt_dlp.YoutubeDL(info_opts) as ydl:
-            info = first_entry(ydl.extract_info(query, download=False))
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(target_url, download=False)
+        # Handle playlists / search results
+        if info and "entries" in info:
+            entries = [e for e in info["entries"] if e]
+            if not entries:
+                return None
+            info = entries[0]
 
         stream_url = info.get("url", "")
         if not stream_url:
-            return "ERROR: No stream URL found."
+            return None
 
         duration_secs = info.get("duration") or 0
-        return json.dumps({
-            "url":      stream_url,
-            "title":    info.get("title", "Unknown"),
-            "artist":   info.get("artist") or info.get("uploader") or info.get("channel") or "",
-            "thumbnail": info.get("thumbnail", ""),
-            "duration": _format_duration(duration_secs),
+        return {
+            "url":            stream_url,
+            "title":          info.get("title", "Unknown"),
+            "artist":         info.get("artist") or info.get("uploader") or info.get("channel") or "",
+            "thumbnail":      info.get("thumbnail", ""),
+            "duration":       _format_duration(duration_secs),
             "durationSeconds": duration_secs,
-            "webpage_url": info.get("webpage_url") or info.get("url") or query,
-        })
+            "webpage_url":    info.get("webpage_url") or target_url,
+        }
+    except Exception:
+        return None
+
+
+def _parallel_resolve(target_url: str, fmt: str) -> dict | None:
+    """Resolve a stream URL using primary-first, then parallel fallback racing.
+
+    1. Try _PRIMARY_CLIENT synchronously.
+    2. On failure, submit ALL _FALLBACK_CLIENTS concurrently via ThreadPoolExecutor.
+    3. Return the first successful result immediately (cancel remaining futures).
+    """
+    # Step 1: Primary client (synchronous — avoids thread overhead for the common case)
+    result = _resolve_with_client(target_url, _PRIMARY_CLIENT, fmt)
+    if result:
+        return result
+
+    # Step 2: Race all fallback clients in parallel
+    with ThreadPoolExecutor(max_workers=len(_FALLBACK_CLIENTS)) as pool:
+        futures = {
+            pool.submit(_resolve_with_client, target_url, client, fmt): client
+            for client in _FALLBACK_CLIENTS
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                # Cancel remaining futures (best-effort, they may already be running)
+                for f in futures:
+                    f.cancel()
+                return result
+
+    return None
+
+
+def get_stream_url(url: str, quality: str = "AUTO") -> str:
+    """Extract a direct streamable audio URL without downloading.
+
+    Args:
+        url: YouTube URL or search query.
+        quality: Audio quality tier — AUTO, HIGH, MEDIUM, or LOW.
+
+    Flow: cache lookup → primary client → parallel fallback racing → cache store.
+    """
+    fmt = _format_for_quality(quality)
+    cache_key = f"{url.strip()}:{quality.upper()}"
+    cached = _stream_cache.get(cache_key)
+    if cached is not None:
+        # Strip internal metadata before returning
+        out = {k: v for k, v in cached.items() if not k.startswith("_")}
+        return json.dumps(out)
+
+    try:
+        target = resolve_query(url)
+        result = _parallel_resolve(target, fmt)
+        if result is None:
+            return "ERROR: No stream URL found after trying all clients."
+
+        _stream_cache.put(cache_key, result)
+        return json.dumps(result)
     except Exception as e:
         return f"ERROR: {str(e)}"
 
 
-def get_stream_url_by_id(video_id: str) -> str:
-    """Resolve a stream URL directly from a YouTube video ID."""
+def get_stream_url_by_id(video_id: str, quality: str = "AUTO") -> str:
+    """Resolve a stream URL directly from a YouTube video ID.
+
+    Args:
+        video_id: YouTube video ID.
+        quality: Audio quality tier — AUTO, HIGH, MEDIUM, or LOW.
+
+    Flow: cache lookup (by videoId) → primary client → parallel fallback racing → cache store.
+    """
+    fmt = _format_for_quality(quality)
+    cache_key = f"{video_id}:{quality.upper()}"
+    cached = _stream_cache.get(cache_key)
+    if cached is not None:
+        out = {k: v for k, v in cached.items() if not k.startswith("_")}
+        return json.dumps(out)
+
     url = f"https://music.youtube.com/watch?v={video_id}"
     try:
-        info_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
-            "format": "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
-        }
-        with yt_dlp.YoutubeDL(info_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+        result = _parallel_resolve(url, fmt)
+        if result is None:
+            return "ERROR: No stream URL found after trying all clients."
 
-        stream_url = info.get("url", "")
-        if not stream_url:
-            return "ERROR: No stream URL found."
-
-        duration_secs = info.get("duration") or 0
-        return json.dumps({
-            "url":      stream_url,
-            "title":    info.get("title", "Unknown"),
-            "artist":   info.get("artist") or info.get("uploader") or info.get("channel") or "",
-            "thumbnail": info.get("thumbnail", ""),
-            "duration": _format_duration(duration_secs),
-            "durationSeconds": duration_secs,
-            "webpage_url": url,
-        })
+        # Ensure webpage_url is set
+        result.setdefault("webpage_url", url)
+        _stream_cache.put(cache_key, result)
+        return json.dumps(result)
     except Exception as e:
         return f"ERROR: {str(e)}"
+
+
+def invalidate_stream_cache(video_id_or_url: str) -> str:
+    """Purge all cached stream URLs for a given videoId or URL.
+
+    Called from Kotlin when a stream 403s or playback fails mid-stream,
+    so the next resolution attempt does a fresh network fetch instead
+    of returning the stale cached URL.
+
+    Invalidates all quality variants (AUTO, HIGH, MEDIUM, LOW).
+    """
+    key = video_id_or_url.strip()
+    for q in ("AUTO", "HIGH", "MEDIUM", "LOW"):
+        _stream_cache.invalidate(f"{key}:{q}")
+    # Also invalidate bare key (legacy compat)
+    _stream_cache.invalidate(key)
+    return json.dumps({"invalidated": key})
 
 
 def download_audio(url: str, download_dir: str) -> str:
@@ -579,128 +755,6 @@ def get_watch_playlist(video_id: str, limit: int = 10) -> str:
     except Exception as e:
         return f"ERROR: {str(e)}"
         
-def search_all(query: str, limit: int = 20) -> str:
-    """Search YouTube Music and split results into songs / albums / singles.
-
-    Runs two ytmusicapi searches in parallel:
-      - filter="songs"  → songs list
-      - filter="albums" → split by item["type"] into albums vs singles/EPs
-
-    Returns JSON: {"songs": [...], "albums": [...], "singles": [...]}
-    Each item matches the existing HomeCard / SearchResult shape so the
-    Kotlin side can reuse HomeCardAdapter / SearchResultAdapter as-is.
-    """
-    query = query.strip()
-    if not query:
-        return "ERROR: empty query"
-    if _ytmusic is None:
-        return "ERROR: ytmusicapi unavailable"
-
-    result = {"songs": [], "albums": [], "singles": []}
-    lock = threading.Lock()
-
-    def fetch_songs():
-        try:
-            raw = _ytmusic.search(query, filter="songs", limit=limit)
-            songs = []
-            for item in raw[:limit]:
-                vid = item.get("videoId", "")
-                if not vid:
-                    continue
-                artists = item.get("artists") or []
-                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
-                duration_secs = item.get("duration_seconds") or 0
-                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
-                songs.append({
-                    "videoId": vid,
-                    "title": item.get("title", "Unknown"),
-                    "artist": artist,
-                    "duration": item.get("duration") or _format_duration(duration_secs),
-                    "durationSeconds": duration_secs,
-                    "thumbnail": thumbnail,
-                    "webpage_url": f"https://music.youtube.com/watch?v={vid}",
-                })
-            with lock:
-                result["songs"] = songs
-        except Exception:
-            pass
-
-    def fetch_albums():
-        try:
-            raw = _ytmusic.search(query, filter="albums", limit=limit)
-            albums, singles = [], []
-            for item in raw[:limit]:
-                browse_id = item.get("browseId", "")
-                if not browse_id:
-                    continue
-                artists = item.get("artists") or []
-                artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
-                thumbnail = _best_thumbnail(item.get("thumbnails") or [])
-                card = _card("", item.get("title", "Unknown"), artist, thumbnail,
-                             card_type="ALBUM", playlist_id=browse_id)
-                if (item.get("type") or "").lower() == "single":
-                    singles.append(card)
-                else:
-                    albums.append(card)
-            with lock:
-                result["albums"] = albums
-                result["singles"] = singles
-        except Exception:
-            pass
-
-    threads = [threading.Thread(target=fetch_songs), threading.Thread(target=fetch_albums)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(timeout=15)
-
-    return json.dumps(result)
-
-
-def get_album_details(browse_id: str, limit: int = 100) -> str:
-    """Fetch full album metadata plus its track list, for the Album Page.
-
-    Returns JSON: {title, artist, thumbnail, year, tracks: [SearchResult dicts]}
-    """
-    if not browse_id or _ytmusic is None:
-        return "ERROR: ytmusicapi unavailable"
-    try:
-        raw = _ytmusic.get_album(browse_id)
-        title = raw.get("title", "Unknown Album")
-        artists = raw.get("artists") or []
-        artist = ", ".join(a.get("name", "") for a in artists if a.get("name"))
-        thumbnail = _best_thumbnail(raw.get("thumbnails") or [])
-        year = raw.get("year", "")
-
-        tracks = []
-        for item in (raw.get("tracks") or [])[:limit]:
-            vid = item.get("videoId", "")
-            if not vid:
-                continue
-            t_artists = item.get("artists") or []
-            t_artist = ", ".join(a.get("name", "") for a in t_artists if a.get("name")) or artist
-            duration_secs = item.get("duration_seconds") or 0
-            tracks.append({
-                "videoId": vid,
-                "title": item.get("title", "Unknown"),
-                "artist": t_artist,
-                "duration": _format_duration(duration_secs),
-                "durationSeconds": duration_secs,
-                "thumbnail": thumbnail,
-                "webpage_url": f"https://music.youtube.com/watch?v={vid}",
-            })
-
-        return json.dumps({
-            "title": title,
-            "artist": artist,
-            "thumbnail": thumbnail,
-            "year": year,
-            "tracks": tracks,
-        })
-    except Exception as e:
-        return f"ERROR: {str(e)}"
-
-
 def get_playlist_tracks(browse_id: str, limit: int = 50) -> str:
     """Fetch tracks for an album or playlist by browseId or playlistId.
 
