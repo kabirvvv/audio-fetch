@@ -514,64 +514,176 @@ _FORMAT_DEFAULT = "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio"
 
 # Network-aware quality tiers → yt-dlp format selectors
 _QUALITY_FORMATS = {
-    "AUTO":   "bestaudio[ext=m4a]/bestaudio/best",
-    "HIGH":   "bestaudio[ext=m4a]/bestaudio/best",
-    "MEDIUM": "bestaudio[abr<=128]/bestaudio",
-    "LOW":    "worstaudio/bestaudio",
+    "AUTO":   "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+    "HIGH":   "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio",
+    "MEDIUM": "bestaudio[abr<=128][ext=m4a]/bestaudio[abr<=128]/bestaudio",
+    "LOW":    "worstaudio[ext=m4a]/worstaudio[ext=aac]/worstaudio",
 }
+
 
 def _format_for_quality(quality: str) -> str:
+    """Return the yt-dlp format selector for a given quality tier."""
     return _QUALITY_FORMATS.get(quality.upper(), _FORMAT_DEFAULT)
 
-# ─────────────────────────────────────────────
-# Persistent yt-dlp Extractor Singleton (High-Performance Engine)
-# ─────────────────────────────────────────────
 
-_YDL_OPTS_PRIMARY = {
-    "quiet": True,
-    "no_warnings": True,
-    "extractor_args": {"youtube": {"player_client": ["android_vr"]}},
-    "format": "bestaudio[ext=m4a]/bestaudio/best",
-    "check_formats": None,
-    "skip_download": True,
-}
+def _resolve_with_client(target_url: str, client: str, fmt: str) -> dict | None:
+    """Attempt stream URL extraction with a specific yt-dlp player_client.
 
-_ydl_primary = yt_dlp.YoutubeDL(_YDL_OPTS_PRIMARY)
-_ydl_lock = threading.Lock()
+    Returns a stream data dict on success, or None on any failure.
+    Designed to be safe for concurrent execution in ThreadPoolExecutor.
+    """
+    try:
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extractor_args": {"youtube": {"player_client": [client]}},
+            "format": fmt,
+            "check_formats": None,
+            "noplaylist": True,
+            "skip_download": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(target_url, download=False)
+        # Handle playlists / search results
+        if info and "entries" in info:
+            entries = [e for e in info["entries"] if e]
+            if not entries:
+                return None
+            info = entries[0]
+
+        stream_url = info.get("url", "")
+        if not stream_url:
+            return None
+
+        duration_secs = info.get("duration") or 0
+        return {
+            "url":            stream_url,
+            "title":          info.get("title", "Unknown"),
+            "artist":         info.get("artist") or info.get("uploader") or info.get("channel") or "",
+            "thumbnail":      info.get("thumbnail", ""),
+            "duration":       _format_duration(duration_secs),
+            "durationSeconds": duration_secs,
+            "webpage_url":    info.get("webpage_url") or target_url,
+        }
+    except Exception:
+        return None
+
+
+def _fast_resolve_innertube(video_id: str, quality: str = "AUTO") -> dict | None:
+    """Fast-path direct InnerTube REST API stream resolution (~200ms).
+
+    Calls YouTube's /youtubei/v1/player JSON endpoint directly. If unencrypted
+    audio URLs are returned, resolves instantly without yt-dlp overhead.
+    """
+    clients = [
+        {"clientName": "ANDROID_VR", "clientVersion": "1.58.1"},
+        {"clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER", "clientVersion": "2.0"},
+    ]
+    api_url = "https://www.youtube.com/youtubei/v1/player"
+
+    for client in clients:
+        payload = {
+            "context": {"client": client},
+            "videoId": video_id
+        }
+        try:
+            req = urllib.request.Request(
+                api_url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Android; Mobile)"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+
+            streaming_data = res.get("streamingData", {})
+            formats = streaming_data.get("adaptiveFormats", []) + streaming_data.get("formats", [])
+            audio_formats = [f for f in formats if "audio" in f.get("mimeType", "") and "url" in f]
+
+            if not audio_formats:
+                continue
+
+            # Quality filtering
+            q_upper = quality.upper()
+            if q_upper in ("AUTO", "HIGH"):
+                m4a = [f for f in audio_formats if "mp4" in f.get("mimeType", "")]
+                if m4a:
+                    m4a.sort(key=lambda x: x.get("bitrate", 0), reverse=True)
+                    chosen = m4a[0]
+                else:
+                    audio_formats.sort(key=lambda x: x.get("bitrate", 0), reverse=True)
+                    chosen = audio_formats[0]
+            elif q_upper == "MEDIUM":
+                audio_formats.sort(key=lambda x: abs(x.get("bitrate", 0) - 128000))
+                chosen = audio_formats[0]
+            else: # LOW
+                audio_formats.sort(key=lambda x: x.get("bitrate", 0))
+                chosen = audio_formats[0]
+
+            stream_url = chosen["url"]
+            details = res.get("videoDetails", {})
+            dur_secs = int(details.get("lengthSeconds", 0))
+
+            return {
+                "url":            stream_url,
+                "title":          details.get("title", "Unknown"),
+                "artist":         details.get("author", ""),
+                "thumbnail":      f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+                "duration":       _format_duration(dur_secs),
+                "durationSeconds": dur_secs,
+                "webpage_url":    f"https://music.youtube.com/watch?v={video_id}",
+            }
+        except Exception:
+            continue
+
+    return None
+
+def _parallel_resolve(target_url: str, fmt: str) -> dict | None:
+    """Resolve a stream URL by racing ALL clients concurrently in parallel from start.
+
+    Races _PRIMARY_CLIENT + _FALLBACK_CLIENTS simultaneously via ThreadPoolExecutor.
+    Returns the first successful result immediately and cancels remaining futures.
+    """
+    all_clients = [_PRIMARY_CLIENT] + list(_FALLBACK_CLIENTS)
+    with ThreadPoolExecutor(max_workers=len(all_clients)) as pool:
+        futures = {
+            pool.submit(_resolve_with_client, target_url, client, fmt): client
+            for client in all_clients
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                for f in futures:
+                    f.cancel()
+                return result
+
+    return None
 
 
 def get_stream_url(url: str, quality: str = "AUTO") -> str:
-    """Extract a direct streamable audio URL using persistent high-performance engine."""
+    """Extract a direct streamable audio URL without downloading.
+
+    Args:
+        url: YouTube URL or search query.
+        quality: Audio quality tier — AUTO, HIGH, MEDIUM, or LOW.
+
+    Flow: cache lookup → primary client → parallel fallback racing → cache store.
+    """
+    fmt = _format_for_quality(quality)
     cache_key = f"{url.strip()}:{quality.upper()}"
     cached = _stream_cache.get(cache_key)
     if cached is not None:
+        # Strip internal metadata before returning
         out = {k: v for k, v in cached.items() if not k.startswith("_")}
         return json.dumps(out)
 
     try:
         target = resolve_query(url)
-        with _ydl_lock:
-            info = _ydl_primary.extract_info(target, download=False)
-            if info and "entries" in info:
-                entries = [e for e in info["entries"] if e]
-                if not entries:
-                    return "ERROR: No stream URL found."
-                info = entries[0]
-
-            stream_url = info.get("url", "")
-            if not stream_url:
-                return "ERROR: No stream URL found."
-
-            duration_secs = info.get("duration") or 0
-            result = {
-                "url":            stream_url,
-                "title":          info.get("title", "Unknown"),
-                "artist":         info.get("artist") or info.get("uploader") or info.get("channel") or "",
-                "thumbnail":      info.get("thumbnail", ""),
-                "duration":       _format_duration(duration_secs),
-                "durationSeconds": duration_secs,
-                "webpage_url":    info.get("webpage_url") or target,
-            }
+        result = _parallel_resolve(target, fmt)
+        if result is None:
+            return "ERROR: No stream URL found after trying all clients."
 
         _stream_cache.put(cache_key, result)
         return json.dumps(result)
@@ -580,7 +692,10 @@ def get_stream_url(url: str, quality: str = "AUTO") -> str:
 
 
 def get_stream_url_by_id(video_id: str, quality: str = "AUTO") -> str:
-    """Resolve a stream URL directly from a YouTube video ID using persistent high-performance engine."""
+    """Resolve a stream URL directly from a YouTube video ID.
+
+    Flow: Cache Lookup → Tier-1 Fast InnerTube REST (~200ms) → Tier-2 Parallel yt-dlp Race → Cache Store.
+    """
     clean_id = video_id.strip()
     cache_key = f"{clean_id}:{quality.upper()}"
     cached = _stream_cache.get(cache_key)
@@ -588,35 +703,44 @@ def get_stream_url_by_id(video_id: str, quality: str = "AUTO") -> str:
         out = {k: v for k, v in cached.items() if not k.startswith("_")}
         return json.dumps(out)
 
-    target_url = f"https://music.youtube.com/watch?v={clean_id}"
     try:
-        with _ydl_lock:
-            info = _ydl_primary.extract_info(target_url, download=False)
-            if info and "entries" in info:
-                entries = [e for e in info["entries"] if e]
-                if not entries:
-                    return "ERROR: No stream URL found."
-                info = entries[0]
+        # Tier 1: Direct InnerTube REST Fast-Path (~200ms)
+        fast_result = _fast_resolve_innertube(clean_id, quality)
+        if fast_result:
+            _stream_cache.put(cache_key, fast_result)
+            return json.dumps(fast_result)
 
-            stream_url = info.get("url", "")
-            if not stream_url:
-                return "ERROR: No stream URL found."
+        # Tier 2: Parallel yt-dlp Racing Engine across 4 clients
+        url = f"https://music.youtube.com/watch?v={clean_id}"
+        fmt = _format_for_quality(quality)
+        result = _parallel_resolve(url, fmt)
+        if result is None:
+            return "ERROR: No stream URL found after trying all clients."
 
-            duration_secs = info.get("duration") or 0
-            result = {
-                "url":            stream_url,
-                "title":          info.get("title", "Unknown"),
-                "artist":         info.get("artist") or info.get("uploader") or info.get("channel") or "",
-                "thumbnail":      info.get("thumbnail", ""),
-                "duration":       _format_duration(duration_secs),
-                "durationSeconds": duration_secs,
-                "webpage_url":    info.get("webpage_url") or target_url,
-            }
-
+        result.setdefault("webpage_url", url)
         _stream_cache.put(cache_key, result)
         return json.dumps(result)
     except Exception as e:
         return f"ERROR: {str(e)}"
+
+
+def invalidate_stream_cache(video_id_or_url: str) -> str:
+    """Purge all cached stream URLs for a given videoId or URL.
+
+    Called from Kotlin when a stream 403s or playback fails mid-stream,
+    so the next resolution attempt does a fresh network fetch instead
+    of returning the stale cached URL.
+
+    Invalidates all quality variants (AUTO, HIGH, MEDIUM, LOW).
+    """
+    key = video_id_or_url.strip()
+    for q in ("AUTO", "HIGH", "MEDIUM", "LOW"):
+        _stream_cache.invalidate(f"{key}:{q}")
+    # Also invalidate bare key (legacy compat)
+    _stream_cache.invalidate(key)
+    return json.dumps({"invalidated": key})
+
+
 def download_audio(url: str, download_dir: str) -> str:
     try:
         query = resolve_query(url)
