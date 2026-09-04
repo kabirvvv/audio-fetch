@@ -531,6 +531,17 @@ private suspend fun fetchOnlineShelves(seedVideoId: String): List<HomeShelf> {
 }
 
 // Replace fetchAndAppendAutoplay() to use InnerTube instead of Python:
+    private fun prefetchNextTrack(idx: Int) {
+        val nextTrack = tracks.getOrNull(idx + 1) ?: return
+        val videoId = nextTrack.videoId ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                Python.getInstance().getModule("main")
+                    .callAttr("get_stream_url_by_id", videoId)
+            } catch (_: Exception) {}
+        }
+    }
+
 private fun fetchAndAppendAutoplay(videoId: String?) {
     if (videoId.isNullOrEmpty()) return
     lifecycleScope.launch {
@@ -539,23 +550,14 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             if (card.videoId.isEmpty()) continue
             if (tracks.any { it.videoId == card.videoId }) continue
 
-            val streamJson = withContext(Dispatchers.IO) {
-                try {
-                    Python.getInstance().getModule("main")
-                        .callAttr("get_stream_url_by_id", card.videoId).toString()
-                } catch (e: Exception) { "ERROR: ${e.message}" }
-            }
-            if (streamJson.startsWith("ERROR")) continue
-
-            val json = org.json.JSONObject(streamJson)
             val track = Track(
-                uri          = android.net.Uri.parse(json.getString("url")),
-                title        = json.optString("title", card.title),
-                artist       = json.optString("artist", card.artist),
-                durationMs   = json.optLong("durationSeconds", 0) * 1000L,
+                uri          = Uri.parse("https://placeholder.invalid/${card.videoId}"),
+                title        = card.title,
+                artist       = card.artist,
+                durationMs   = 0L,
                 videoId      = card.videoId,
                 isAutoplay   = true,
-                thumbnailUrl = json.optString("thumbnail", card.thumbnail)
+                thumbnailUrl = card.thumbnail
             )
             tracks.add(track)
             player?.addMediaItem(MediaItem.fromUri(track.uri))
@@ -1185,15 +1187,62 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
                 val idx = player?.currentMediaItemIndex ?: return
                 if (idx >= 0 && idx < tracks.size) {
                     currentIndex = idx
-                    setTrackInfo(tracks[idx])
+                    val currentTrack = tracks[idx]
+                    setTrackInfo(currentTrack)
                     trackAdapter.setNowPlaying(idx)
-                    LibraryManager.addToHistory(this@MainActivity, tracks[idx])
+                    LibraryManager.addToHistory(this@MainActivity, currentTrack)
                     if (lyricsVisible) hideLyrics()
                     syncedLines = emptyList()
                     currentLyricLine = -1
+
+                    // Just-In-Time (JIT) Stream Resolution
+                    val videoId = currentTrack.videoId
+                    val isPlaceholder = currentTrack.uri == Uri.EMPTY || currentTrack.uri.toString().contains("placeholder")
+                    if (!videoId.isNullOrEmpty() && isPlaceholder) {
+                        runOnUiThread { setStatus("Resolving stream…", StatusType.NEUTRAL) }
+                        lifecycleScope.launch {
+                            val streamJson = withContext(Dispatchers.IO) {
+                                try {
+                                    Python.getInstance().getModule("main")
+                                        .callAttr("get_stream_url_by_id", videoId).toString()
+                                } catch (e: Exception) { "ERROR: ${e.message}" }
+                            }
+                            if (!streamJson.startsWith("ERROR")) {
+                                try {
+                                    val json = JSONObject(streamJson)
+                                    val freshUrl = json.getString("url")
+                                    val freshUri = Uri.parse(freshUrl)
+                                    val updatedTrack = currentTrack.copy(
+                                        uri = freshUri,
+                                        title = json.optString("title", currentTrack.title),
+                                        artist = json.optString("artist", currentTrack.artist),
+                                        thumbnailUrl = json.optString("thumbnail", currentTrack.thumbnailUrl)
+                                    )
+                                    tracks[idx] = updatedTrack
+                                    trackAdapter.updateTracks(tracks)
+                                    setTrackInfo(updatedTrack)
+
+                                    val freshMediaItem = MediaItem.Builder()
+                                        .setUri(freshUri)
+                                        .setMediaMetadata(MediaMetadata.Builder().setTitle(updatedTrack.title).setArtist(updatedTrack.artist).build())
+                                        .build()
+                                    player?.replaceMediaItem(idx, freshMediaItem)
+                                    player?.prepare()
+                                    player?.play()
+                                    runOnUiThread { setStatus("streaming: ${updatedTrack.title}", StatusType.SUCCESS) }
+                                } catch (e: Exception) {
+                                    runOnUiThread { setStatus("ERROR: ${e.message}", StatusType.ERROR) }
+                                }
+                            } else {
+                                runOnUiThread { setStatus(streamJson, StatusType.ERROR) }
+                            }
+                        }
+                    }
+
                     if (autoplayEnabled && idx >= tracks.size - 2) {
                         fetchAndAppendAutoplay(tracks[idx].videoId)
                     }
+                    prefetchNextTrack(idx)
                 }
                 resetLikeUI()
             }
@@ -1720,6 +1769,7 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
         showMiniPlayer()
         showFullPlayer()
 
+        prefetchNextTrack(currentIndex)
         if (autoplayEnabled && parsedVideoId != null) {
             fetchAndAppendAutoplay(parsedVideoId)
         }
