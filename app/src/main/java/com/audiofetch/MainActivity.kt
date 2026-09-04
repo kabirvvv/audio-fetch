@@ -34,6 +34,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -1200,6 +1201,48 @@ private fun fetchAndAppendAutoplay(videoId: String?) {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED && repeatMode == Player.REPEAT_MODE_ONE) {
                     player?.seekTo(0); player?.play()
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e("AudioFetch", "Player error: ${error.message}", error)
+                val currentTrack = tracks.getOrNull(currentIndex)
+                val videoId = currentTrack?.videoId
+                val uriStr = currentTrack?.uri?.toString()
+                val key = videoId ?: uriStr
+
+                if (!key.isNullOrEmpty()) {
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            Python.getInstance().getModule("main")
+                                .callAttr("invalidate_stream_cache", key)
+                        } catch (e: Exception) {
+                            Log.e("AudioFetch", "Cache invalidation error: ${e.message}")
+                        }
+                    }
+
+                    if (!videoId.isNullOrEmpty()) {
+                        runOnUiThread { setStatus("Stream expired, self-healing…", StatusType.NEUTRAL) }
+                        lifecycleScope.launch {
+                            val streamJson = withContext(Dispatchers.IO) {
+                                try {
+                                    Python.getInstance().getModule("main")
+                                        .callAttr("get_stream_url_by_id", videoId).toString()
+                                } catch (e: Exception) { "ERROR: ${e.message}" }
+                            }
+                            if (!streamJson.startsWith("ERROR")) {
+                                try {
+                                    val json = JSONObject(streamJson)
+                                    val newStreamUrl = json.getString("url")
+                                    val newMediaItem = MediaItem.fromUri(Uri.parse(newStreamUrl))
+                                    player?.replaceMediaItem(currentIndex, newMediaItem)
+                                    player?.prepare()
+                                    player?.play()
+                                    runOnUiThread { setStatus("Self-healed stream", StatusType.SUCCESS) }
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
                 }
             }
         })
