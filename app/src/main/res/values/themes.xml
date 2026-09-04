@@ -1,16 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AudioFetch" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.AudioFetch" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- M3 Primary Roles -->
         <item name="colorPrimary">@color/accent</item>
-        <item name="colorPrimaryVariant">@color/surface</item>
         <item name="colorOnPrimary">#000000</item>
+        <item name="colorPrimaryContainer">@color/surface</item>
+        <item name="colorOnPrimaryContainer">@color/accent</item>
+
+        <!-- M3 Secondary & Tertiary Roles -->
+        <item name="colorSecondary">@color/accent</item>
+        <item name="colorOnSecondary">#000000</item>
+        <item name="colorSecondaryContainer">@color/surface</item>
+        <item name="colorOnSecondaryContainer">@color/text</item>
+        <item name="colorTertiary">@color/accent</item>
+        <item name="colorOnTertiary">#000000</item>
+
+        <!-- M3 Surface & Background Roles -->
         <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text</item>
+        <item name="colorSurfaceVariant">@color/surface</item>
+        <item name="colorOnSurfaceVariant">@color/text_low</item>
+        <item name="colorSurfaceContainer">@color/bg_deep</item>
+        <item name="colorSurfaceContainerHigh">@color/surface</item>
+        <item name="colorSurfaceContainerHighest">@color/surface</item>
+
         <item name="android:colorBackground">@color/bg</item>
         <item name="android:textColorPrimary">@color/text</item>
         <item name="android:statusBarColor">@color/bg</item>
         <item name="android:navigationBarColor">@color/bg</item>
     </style>
-     <style name="RoundedCorner8" parent="">
+
+    <!-- M3 Expressive Shapes -->
+    <style name="ShapeAppearance.AudioFetch.Rounded" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="ShapeAppearance.AudioFetch.Pill" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="ShapeAppearance.AudioFetch.Container" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">28dp</item>
+    </style>
+
+    <!-- Legacy compatibility tag -->
+    <style name="RoundedCorner8" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">8dp</item>
     </style>
