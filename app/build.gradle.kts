@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 34
 
-        versionCode = 71
+        versionCode = 72
         versionName = "5.1"
 
         ndk {
